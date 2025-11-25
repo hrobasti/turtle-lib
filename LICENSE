@@ -1,0 +1,66 @@
+TURTLE LIB PROPRIETARY LICENSE
+
+Copyright (c) 2025 hrobasti
+All rights reserved.
+
+1. DEFINITIONS
+   "Software" refers to the source code, binaries, and assets contained in the
+   turtle-lib project.
+   "You" refers to the individual or legal entity exercising permissions under
+   this License.
+
+2. GRANT OF RIGHTS
+   2.1 Private Use. You may download, install, and use the Software for private
+       or internal purposes without charge.
+   2.2 Commercial Use. Any commercial use, including providing services,
+       products, or offerings that incorporate or rely on the Software, requires
+       prior written permission from hrobasti. Requests may be submitted via
+       https://github.com/hrobasti or other published contact channels.
+
+3. ATTRIBUTION
+   Any distribution or public use of the Software must include a prominent
+   notice stating: "Includes turtle-lib by hrobasti" (or a substantially
+   similar attribution) together with a link to https://github.com/hrobasti.
+
+4. NO MODIFICATIONS
+   You may not modify, adapt, translate, reverse engineer (except where legally
+   required), or create derivative works of the Software. Distribution of
+   modified copies, partial copies, or derivative works is expressly prohibited.
+
+5. REDISTRIBUTION OF UNMODIFIED COPIES
+   You may redistribute the Software only in its complete, unmodified form and
+   only if you:
+     a) include this License in full with the distribution, and
+     b) preserve all copyright, trademark, attribution, and proprietary notices,
+        including those within source files and accompanying documentation.
+
+6. THIRD-PARTY COMPONENTS
+   The Software bundles the bStats Metrics class, which is licensed under the
+   MIT License. When redistributing the Software, you must include the
+   corresponding MIT license text and comply with its terms. No other rights in
+   third-party materials are granted by this License.
+
+7. TERMINATION
+   Any breach of this License automatically terminates your rights to use the
+   Software. Upon termination, you must cease all use and distribution of the
+   Software and destroy all copies in your possession. Rights previously granted
+   to third parties in compliance with this License are unaffected.
+
+8. DISCLAIMER OF WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. YOUR USE OF THE
+   SOFTWARE IS AT YOUR SOLE RISK.
+
+9. LIMITATION OF LIABILITY
+   IN NO EVENT WILL HRO BASTI OR CONTRIBUTORS BE LIABLE FOR ANY DAMAGES OR
+   OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+   ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+10. GOVERNING LAW
+    This License is governed by the laws of your local jurisdiction unless a
+    separate written agreement with hrobasti specifies otherwise.
+
+For commercial licensing or clarifications, contact hrobasti via
+https://github.com/hrobasti.

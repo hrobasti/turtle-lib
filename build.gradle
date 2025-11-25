@@ -1,0 +1,35 @@
+import org.gradle.jvm.tasks.Jar
+
+plugins {
+    id 'java-library'
+}
+
+group = 'com.github.hrobasti.turtlelib'
+
+def versionProps = new Properties()
+def versionFile = file('version.properties')
+if (versionFile.exists()) {
+    versionFile.withInputStream { versionProps.load(it) }
+}
+def resolvedVersion = versionProps.getProperty('version')
+if (resolvedVersion == null || resolvedVersion.trim().isEmpty()) {
+    resolvedVersion = project.findProperty('version') ?: '1.0-SNAPSHOT'
+}
+version = resolvedVersion
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'papermc-repo'
+        url = uri('https://repo.papermc.io/repository/maven-public/')
+    }
+}
+
+dependencies {
+    api('com.google.code.gson:gson:2.10.1')
+    compileOnly('io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT')
+}
+
+tasks.withType(Jar).configureEach {
+    archiveBaseName.set('turtle-lib-paper')
+}
