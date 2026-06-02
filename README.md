@@ -14,8 +14,8 @@ Shared helper library for building Minecraft Paper plugins faster. Grab the modu
 
 ## Requirements
 
-- Java 25+
-- Gradle wrapper (included) targeting 8.10.2
+- Java 26+
+- Gradle wrapper (included) targeting 9.4.0
 - Paper API 26.1.x on the compile classpath (validated for 26.1 / 26.1.1 / 26.1.2)
 
 ## Quick Start
