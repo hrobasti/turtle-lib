@@ -2,6 +2,7 @@ import org.gradle.jvm.tasks.Jar
 
 plugins {
     id 'java-library'
+	id 'maven-publish'
 }
 
 group = 'com.github.hrobasti.turtlelib'
@@ -48,4 +49,12 @@ tasks.named('sourcesJar', Jar) {
 
 tasks.named('clean') {
     delete layout.projectDirectory.dir('dist')
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
 }
