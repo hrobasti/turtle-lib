@@ -2,10 +2,11 @@ import org.gradle.jvm.tasks.Jar
 
 plugins {
     id 'java-library'
-	id 'maven-publish'
+    id 'maven-publish'
+    alias(libs.plugins.spotless)
 }
 
-group = 'com.github.hrobasti.turtlelib'
+group = 'net.kroet.turtlelib'
 
 def versionProps = new Properties()
 def versionFile = file('version.properties')
@@ -14,10 +15,9 @@ if (versionFile.exists()) {
 }
 def resolvedVersion = versionProps.getProperty('version')
 if (resolvedVersion == null || resolvedVersion.trim().isEmpty()) {
-    resolvedVersion = project.findProperty('version') ?: '1.0-SNAPSHOT'
+    resolvedVersion = providers.gradleProperty('version').getOrElse('1.0-SNAPSHOT')
 }
 version = resolvedVersion
-def paperApiVersion = (project.findProperty('paperApiVersion') ?: '26.3.build.30-alpha').toString()
 
 java {
     toolchain {
@@ -35,23 +35,102 @@ repositories {
 }
 
 dependencies {
-    api('com.google.code.gson:gson:2.10.1')
-    compileOnly("io.papermc.paper:paper-api:${paperApiVersion}")
+    // Gson and Adventure come with paper-api (compileOnly, provided by Paper at runtime),
+    // so they are never bundled and need no version of their own here.
+    compileOnly(libs.paper.api)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    // Unlike most Paper API types, YamlConfiguration/MemoryConfiguration are fully
+    // self-contained (no running server needed), so LangLoaderMergeTest can use them
+    // directly as plain test fixtures.
+    testImplementation(libs.paper.api)
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('cleanDist', Delete) {
+    delete layout.projectDirectory.dir('dist')
 }
 
 tasks.named('jar', Jar) {
+    dependsOn tasks.named('cleanDist')
     archiveBaseName.set('turtle-lib-paper')
     destinationDirectory.set(layout.projectDirectory.dir('dist'))
+    from(layout.projectDirectory.file('LICENSE')) {
+        into 'META-INF'
+    }
 }
 
 tasks.named('sourcesJar', Jar) {
+    dependsOn tasks.named('cleanDist')
     archiveBaseName.set('turtle-lib-paper')
     archiveClassifier.set('sources')
     destinationDirectory.set(layout.projectDirectory.dir('dist/sources'))
+    from(layout.projectDirectory.file('LICENSE')) {
+        into 'META-INF'
+    }
+}
+
+// Local SHA-256 checksums next to each release jar, verifiable with `sha256sum -c`.
+// Every jar task triggers it, so a partial build never leaves a jar without one.
+def distDir = layout.projectDirectory.dir('dist')
+tasks.register('checksumDist') {
+    mustRunAfter tasks.named('jar'), tasks.named('sourcesJar')
+    def jars = fileTree(distDir) { include '**/*.jar' }
+    doLast {
+        jars.files.each { jarFile ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256').digest(jarFile.bytes)
+            def sha256 = digest.collect { String.format('%02x', it & 0xff) }.join()
+            new File(jarFile.parentFile, "${jarFile.name}.sha256").text = "${sha256}  ${jarFile.name}\n"
+        }
+    }
+}
+
+tasks.named('jar') {
+    finalizedBy tasks.named('checksumDist')
+}
+
+tasks.named('sourcesJar') {
+    finalizedBy tasks.named('checksumDist')
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('jar')
+    dependsOn tasks.named('sourcesJar')
+    dependsOn tasks.named('checksumDist')
 }
 
 tasks.named('clean') {
     delete layout.projectDirectory.dir('dist')
+}
+
+// Enforced Java formatting via the DiffPlug Spotless plugin (Eclipse JDT formatter).
+// `spotlessCheck` is wired into `check`, so `./gradlew build` fails on unformatted
+// code; run `./gradlew spotlessApply` to fix it locally before committing.
+spotless {
+    // Preserve each file's existing line-ending style (repo mixes LF and CRLF per
+    // .gitattributes); only whitespace/newline hygiene is enforced below, not EOL style.
+    lineEndings = com.diffplug.spotless.LineEnding.PRESERVE
+    java {
+        target 'src/**/*.java'
+        // Import steps run first so the Eclipse formatter has the last word on layout.
+        removeUnusedImports()
+        importOrder()
+        forbidWildcardImports()
+        eclipse().configFile('config/spotless-eclipse-formatter.properties')
+        toggleOffOn()
+        trimTrailingWhitespace()
+        endWithNewline()
+        leadingTabsToSpaces(4)
+    }
+    format 'resources', {
+        target 'src/**/*.yml', 'src/**/*.yaml', 'src/**/*.properties', 'src/**/*.txt'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 publishing {

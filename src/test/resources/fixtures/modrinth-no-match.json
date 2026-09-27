@@ -1,0 +1,12 @@
+[
+    {
+        "version_number": "2.0.0",
+        "version_type": "release",
+        "game_versions": ["25.1"]
+    },
+    {
+        "version_number": "1.9.0",
+        "version_type": "release",
+        "game_versions": ["25.0"]
+    }
+]

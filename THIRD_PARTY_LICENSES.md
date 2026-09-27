@@ -1,10 +1,10 @@
 # Third-Party Licenses
 
-| Dependency | Version (current) | License | Upstream | Notes |
-| --- | --- | --- | --- | --- |
-| net.kyori:adventure-text-minimessage | 4.17.0 | MIT License | https://github.com/KyoriPowered/adventure | Used by `MessageService` to render MiniMessage strings and prefixes. |
-| com.google.code.gson:gson | 2.10.1 | Apache License 2.0 | https://github.com/google/gson | Lightweight JSON parsing for helper utilities. |
+| Dependency                                                                                             | Version (current)                    | License            | Upstream                                  | Used by                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Adventure (`net.kyori:adventure-api`, `adventure-text-minimessage`, `adventure-text-serializer-plain`) | provided by Paper (currently 5.2.0)  | MIT License        | https://github.com/KyoriPowered/adventure | `MessageService` (components, MiniMessage, plain text), `StartupBanner` (MiniMessage), `LocaleFileChecker` (strict MiniMessage parse). |
+| `com.google.code.gson:gson`                                                                            | provided by Paper (currently 2.14.0) | Apache License 2.0 | https://github.com/google/gson            | `UpdateChecker` (parsing Modrinth/Hangar responses; `ProviderResult#metadata()`).                                                      |
 
-The corresponding license texts are shipped alongside the consuming plugins under `src/main/resources/licenses/` when shaded.
+Neither dependency is bundled into a TurtleLib artifact: both reach the compile classpath only through the `compileOnly` Paper API, Paper provides them at runtime, and their versions follow Paper's. Plugins consuming TurtleLib get them the same way and shouldn't declare or shade their own copies; see `timberella-plugin` and `underwatertrees-plugin` for the pattern.
 
-Because turtle-lib is bundled through composite builds, please keep these notices intact whenever you redistribute the library or plugins that embed it.
+TurtleLib itself is MIT-licensed (see `LICENSE`). A plugin that shades TurtleLib into its jar has to include TurtleLib's copyright and license notice, as the MIT License requires.
