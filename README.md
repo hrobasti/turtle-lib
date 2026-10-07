@@ -22,7 +22,7 @@ Shared helper library for building Minecraft Paper plugins faster. Grab the modu
 - Java 25+
 - Gradle wrapper (included) targeting 9.8.0
 - Paper API 26.3 (built against `26.3.build.49-alpha`) on the compile classpath
-- The version catalog `gradle/libs.versions.toml` (loaded automatically by Gradle; it pins Paper, bStats, JUnit, the `turtleLib` version, the compile-only APIs of other plugins that Timberella supports, and the Shadow/Spotless Gradle plugins and is a copy of the workspace root's catalog, kept in sync by `sync-gradle-wrapper.ps1`)
+- The version catalog `gradle/libs.versions.toml` (loaded automatically by Gradle; it pins Paper, bStats, JUnit, the `turtleLib` version, the compile-only APIs of other plugins that Timberella supports, and the Shadow/Spotless Gradle plugins and is a copy of the workspace root's catalog, kept in sync by `Sync-GradleWrapper.ps1`)
 
 ## Quick Start
 
@@ -34,10 +34,10 @@ TurtleLib isn't published to a Maven repository; tagged releases attach the jar 
 2. `./gradlew clean build` → JAR lands in `dist/turtle-lib-paper-<version>.jar`, the sources JAR in `dist/sources/turtle-lib-paper-<version>-sources.jar`, each with a `.sha256` checksum file next to it (verify with `sha256sum -c`). `dist/` is wiped at the start of every build. Run the full `build` for a release: a single `jar` or `sourcesJar` task still writes its checksum, but leaves the other jar missing.
 3. `git tag <version>` (no `v` prefix — the tag name must equal `version.properties` exactly) and push it.
 4. Create a GitHub Release for that tag and attach `dist/turtle-lib-paper-<version>.jar` **unrenamed**. The filename must match `turtle-lib-paper-<version>.jar` or Gradle's ivy lookup 404s.
-5. Bump `turtleLib` in the workspace root's `gradle/libs.versions.toml` (it must equal the tag exactly) and run `sync-gradle-wrapper.ps1`, so timberella-plugin/underwatertrees-plugin pick up the new version.
+5. Bump `turtleLib` in the workspace root's `gradle/libs.versions.toml` (it must equal the tag exactly) and run `Sync-GradleWrapper.ps1`, so timberella-plugin/underwatertrees-plugin pick up the new version.
 6. Update the TurtleLib and Paper API versions in the Gradle example on the wiki's Home page, so it stays copyable.
 
-Make your own version bumps in the workspace root's `gradle/libs.versions.toml`, then run `sync-gradle-wrapper.ps1`. A value changed only in a repo's own catalog copy, such as a merged Dependabot pull request, is taken into the root catalog and passed on to the other repos by the next run. If repos disagree on a value, the root changed it differently, or a repo added or removed an entry, the script copies nothing and lists those entries; settle them and sync again, or pass `-Force` to overwrite the repo copies on purpose. It also copies the Gradle wrapper and the `gradlew`/`gradlew.bat` start scripts byte for byte, without that check.
+Make your own version bumps in the workspace root's `gradle/libs.versions.toml`, then run `Sync-GradleWrapper.ps1`. A value changed only in a repo's own catalog copy, such as a merged Dependabot pull request, is taken into the root catalog and passed on to the other repos by the next run. If repos disagree on a value, the root changed it differently, or a repo added or removed an entry, the script copies nothing and lists those entries; settle them and sync again, or pass `-Force` to overwrite the repo copies on purpose. It also copies the Gradle wrapper and the `gradlew`/`gradlew.bat` start scripts byte for byte, without that check.
 
 Release TurtleLib first, the plugins that depend on it afterwards. If `turtleLib` already names a version whose GitHub Release doesn't exist yet, the plugins' default build fails with a 404 on the jar; until the release is published, build them with `-PuseLocalTurtleLib=true`.
 
@@ -48,5 +48,5 @@ Deep dives for every helper (usage patterns, advanced settings, code samples) li
 ## License & Credits
 
 - TurtleLib is released under the MIT License (see `LICENSE`), Copyright (c) 2025-2026 [kroet.net](https://kroet.net). Releases before 2.0.0 were published under a proprietary license; kroet.net additionally makes them available under the MIT License.
-- Third-party dependencies (Adventure/MIT, Gson/Apache 2.0) are listed in `THIRD_PARTY_LICENSES.md`. Both come with the `compileOnly` Paper API and are not bundled into the TurtleLib jar.
+- Third-party dependencies (Adventure/MIT, Gson/Apache 2.0) are listed in `THIRD_PARTY_NOTICES.md`. Both come with the `compileOnly` Paper API and are not bundled into the TurtleLib jar.
 - Parts of this library and its documentation were produced with AI assistance and reviewed by the maintainer before release.

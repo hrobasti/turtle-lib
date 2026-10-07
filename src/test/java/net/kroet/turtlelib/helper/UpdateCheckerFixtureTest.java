@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 /**
- * Feeds Modrinth/Hangar API responses (hangar-result-wrapper.json is a trimmed
+ * Feeds Modrinth/Hangar API responses (hangar_result_wrapper.json is a trimmed
  * real response) straight into version selection - no network, no Plugin.
  */
 class UpdateCheckerFixtureTest {
@@ -41,7 +41,7 @@ class UpdateCheckerFixtureTest {
     @Test
     void modrinthPicksTheFirstVersionMatchingTheServerVersion() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
-        var selected = checker.selectModrinthVersion(loadFixture("modrinth-match.json"));
+        var selected = checker.selectModrinthVersion(loadFixture("modrinth_match.json"));
 
         assertEquals("1.8.0", selected.json().get("version_number").getAsString());
         assertFalse(selected.compatibilityUnknown());
@@ -50,7 +50,7 @@ class UpdateCheckerFixtureTest {
     @Test
     void modrinthFallsBackToAnUnlabeledVersionOnlyWhenNothingElseMatches() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
-        var selected = checker.selectModrinthVersion(loadFixture("modrinth-unknown-fallback.json"));
+        var selected = checker.selectModrinthVersion(loadFixture("modrinth_unknown_fallback.json"));
 
         // No game_versions field at all is treated as "unknown", not an automatic
         // match - it's only picked when no better candidate exists.
@@ -62,7 +62,7 @@ class UpdateCheckerFixtureTest {
     void modrinthReturnsNullWhenEveryVersionIsExplicitlyIncompatible() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
 
-        assertNull(checker.selectModrinthVersion(loadFixture("modrinth-no-match.json")));
+        assertNull(checker.selectModrinthVersion(loadFixture("modrinth_no_match.json")));
     }
 
     @Test
@@ -83,7 +83,7 @@ class UpdateCheckerFixtureTest {
     @Test
     void hangarSkipsOtherGameVersionsAndPrereleases() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
-        var selected = checker.selectHangarVersion(loadFixture("hangar-array.json"));
+        var selected = checker.selectHangarVersion(loadFixture("hangar_array.json"));
 
         // 1.4.0 targets 26.4 only; 1.3.2 matches but is on the Snapshot channel.
         assertEquals("1.3.1", selected.json().get("name").getAsString());
@@ -93,7 +93,7 @@ class UpdateCheckerFixtureTest {
     @Test
     void hangarMatchesAHotfixServerAgainstItsMinorSeries() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3.2");
-        var selected = checker.selectHangarVersion(loadFixture("hangar-array.json"));
+        var selected = checker.selectHangarVersion(loadFixture("hangar_array.json"));
 
         assertEquals("1.3.1", selected.json().get("name").getAsString());
     }
@@ -104,7 +104,7 @@ class UpdateCheckerFixtureTest {
     void hangarEntryWithoutPlatformDataIsOnlyAnUnknownFallback() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.5");
 
-        assertNull(checker.selectHangarVersion(loadFixture("hangar-array.json")));
+        assertNull(checker.selectHangarVersion(loadFixture("hangar_array.json")));
         var selected = checker.selectHangarVersion(JsonParser.parseString("""
                 [{"name": "1.3.0", "channel": {"name": "Release"}, "platformDependencies": {"PAPER": ["26.4"]}},
                  {"name": "1.2.0", "channel": {"name": "Release"}}]
@@ -117,12 +117,12 @@ class UpdateCheckerFixtureTest {
     void realHangarResponseOffersNothingForAServerItWasNotPublishedFor() {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
 
-        assertNull(checker.selectHangarVersion(loadFixture("hangar-result-wrapper.json")));
+        assertNull(checker.selectHangarVersion(loadFixture("hangar_result_wrapper.json")));
     }
 
     @Test
     void realHangarResponsePicksTheNewestVersionForTheServer() {
-        JsonElement fixture = loadFixture("hangar-result-wrapper.json");
+        JsonElement fixture = loadFixture("hangar_result_wrapper.json");
 
         var on262 = new UpdateChecker(false, true, "26.2").selectHangarVersion(fixture);
         var on2612 = new UpdateChecker(false, true, "26.1.2").selectHangarVersion(fixture);
@@ -135,7 +135,7 @@ class UpdateCheckerFixtureTest {
     @Test
     void serverVersionFilterIsSkippedWhenDisabled() {
         UpdateChecker checker = new UpdateChecker(false, false, null);
-        var selected = checker.selectModrinthVersion(loadFixture("modrinth-no-match.json"));
+        var selected = checker.selectModrinthVersion(loadFixture("modrinth_no_match.json"));
 
         // With filterByServerVersion=false, the first eligible (non-prerelease) entry
         // wins regardless of game_versions.
