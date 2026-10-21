@@ -41,6 +41,10 @@ Make your own version bumps in the workspace root's `gradle/libs.versions.toml`,
 
 Release TurtleLib first, the plugins that depend on it afterwards. If `turtleLib` already names a version whose GitHub Release doesn't exist yet, the plugins' default build fails with a 404 on the jar; until the release is published, build them with `-PuseLocalTurtleLib=true`.
 
+## Update check & privacy
+
+TurtleLib connects to nothing on its own. Only a plugin that uses `UpdateChecker` queries `api.modrinth.com` (Modrinth) and `hangar.papermc.io` (Hangar), sending the server's IP address (part of every web request), the user agent `<PluginName>-UpdateChecker` and the project ID. Each plugin documents this and how to switch it off on its own page.
+
 ## Learn More
 
 Deep dives for every helper (usage patterns, advanced settings, code samples) live in the [TurtleLib wiki](https://github.com/hrobasti/turtle-lib/wiki). Start at [Home](https://github.com/hrobasti/turtle-lib/wiki/Home) to pick the article you need.
@@ -48,5 +52,5 @@ Deep dives for every helper (usage patterns, advanced settings, code samples) li
 ## License & Credits
 
 - TurtleLib is released under the MIT License (see `LICENSE`), Copyright (c) 2025-2026 [kroet.net](https://kroet.net). Releases before 2.0.0 were published under a proprietary license; kroet.net additionally makes them available under the MIT License.
-- Third-party dependencies (Adventure/MIT, Gson/Apache 2.0) are listed in `THIRD_PARTY_NOTICES.md`. Both come with the `compileOnly` Paper API and are not bundled into the TurtleLib jar.
+- The TurtleLib jar bundles no third-party code; the libraries Paper provides are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - Parts of this library and its documentation were produced with AI assistance and reviewed by the maintainer before release.

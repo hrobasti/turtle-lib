@@ -1,10 +1,15 @@
-# Third-Party Notices
+# Third-party notices
 
-| Dependency                                                                                             | Version (current)                    | License            | Upstream                                  | Used by                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Adventure (`net.kyori:adventure-api`, `adventure-text-minimessage`, `adventure-text-serializer-plain`) | provided by Paper (currently 5.2.0)  | MIT License        | https://github.com/KyoriPowered/adventure | `MessageService` (components, MiniMessage, plain text), `StartupBanner` (MiniMessage), `LocaleFileChecker` (strict MiniMessage parse). |
-| `com.google.code.gson:gson`                                                                            | provided by Paper (currently 2.14.0) | Apache License 2.0 | https://github.com/google/gson            | `UpdateChecker` (parsing Modrinth/Hangar responses; `ProviderResult#metadata()`).                                                      |
+TurtleLib by kroet.net contains no third-party software. Its jar `turtle-lib-paper-<version>.jar` holds only TurtleLib's own code and its license as `META-INF/LICENSE` (MIT). A plugin that shades TurtleLib ships that license text with it, as the MIT License requires.
 
-Neither dependency is bundled into a TurtleLib artifact: both reach the compile classpath only through the `compileOnly` Paper API, Paper provides them at runtime, and their versions follow Paper's. Plugins consuming TurtleLib get them the same way and shouldn't declare or shade their own copies; see `timberella-plugin` and `underwatertrees-plugin` for the pattern.
+## Trademarks
 
-TurtleLib itself is MIT-licensed (see `LICENSE`). A plugin that shades TurtleLib into its jar has to include TurtleLib's copyright and license notice, as the MIT License requires.
+- Minecraft and its names belong to Mojang Studios and Microsoft. TurtleLib is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.
+- Paper, Hangar and Modrinth are named only to identify the platforms and services TurtleLib works with; the names belong to their owners.
+
+## Not shipped
+
+Never part of the TurtleLib jar; versions in `gradle/libs.versions.toml`:
+
+- Provided at runtime by Paper: the Paper API (Paper's own license terms) with Adventure and MiniMessage (MIT) and Gson (Apache-2.0). Plugins that use TurtleLib get them the same way and do not shade them.
+- Used only for tests: JUnit 6 (Jupiter and Platform Launcher; EPL-2.0).
