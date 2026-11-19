@@ -20,7 +20,7 @@ Shared helper library for building Minecraft Paper plugins faster. Grab the modu
 ## Requirements
 
 - Java 25+
-- Gradle wrapper (included) targeting 9.8.0
+- Gradle wrapper (included) targeting 9.8.2
 - Paper API 26.3 (built against `26.3.build.49-alpha`) on the compile classpath
 - The version catalog `gradle/libs.versions.toml` (loaded automatically by Gradle; it pins Paper, bStats, JUnit, the `turtleLib` version, the compile-only APIs of other plugins that Timberella supports, and the Shadow/Spotless Gradle plugins and is a copy of the workspace root's catalog, kept in sync by `Sync-GradleWrapper.ps1`)
 
