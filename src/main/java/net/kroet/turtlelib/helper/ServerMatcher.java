@@ -14,6 +14,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility that verifies whether the currently running Paper/Minecraft version
@@ -26,12 +27,12 @@ public final class ServerMatcher {
         WARN_AND_CONTINUE, ERROR_AND_DISABLE
     }
 
-    private final JavaPlugin plugin;
+    private final @Nullable JavaPlugin plugin; // null only for rulesBuilder()
     private final Set<String> exactVersions;
     private final List<VersionRange> ranges;
     private final Set<String> minorSeries;
     private final IncompatibleAction action;
-    private final Consumer<MatchResult> mismatchConsumer;
+    private final @Nullable Consumer<MatchResult> mismatchConsumer;
     private final String supportedSummary;
 
     private ServerMatcher(Builder builder) {
@@ -57,6 +58,7 @@ public final class ServerMatcher {
      * Checks the current server without taking any automatic action.
      */
     public MatchResult check() {
+        JavaPlugin plugin = Objects.requireNonNull(this.plugin, "plugin");
         return evaluate(plugin.getServer().getName(), readMinecraftVersion(Bukkit::getMinecraftVersion));
     }
 
@@ -64,7 +66,7 @@ public final class ServerMatcher {
      * The server's Minecraft version, or {@code null} where the Paper method is
      * missing, as on Spigot. Package-private for ServerMatcherTest.
      */
-    static String readMinecraftVersion(Supplier<String> paperMinecraftVersion) {
+    static @Nullable String readMinecraftVersion(Supplier<? extends @Nullable String> paperMinecraftVersion) {
         try {
             return paperMinecraftVersion.get();
         } catch (NoSuchMethodError e) {
@@ -73,7 +75,7 @@ public final class ServerMatcher {
     }
 
     // A server that can't report its Minecraft version is never supported.
-    MatchResult evaluate(String serverName, String mcVersion) {
+    MatchResult evaluate(String serverName, @Nullable String mcVersion) {
         if (mcVersion == null) {
             return new MatchResult(false, serverName, "unknown", supportedSummary, "Server " + serverName
                     + " doesn't report its Minecraft version (no Paper API), so it counts as unsupported");
@@ -88,6 +90,7 @@ public final class ServerMatcher {
      * unsupported.
      */
     public MatchResult enforce() {
+        JavaPlugin plugin = Objects.requireNonNull(this.plugin, "plugin");
         return enforce(check(), plugin.getLogger(), () -> Bukkit.getPluginManager().disablePlugin(plugin));
     }
 
@@ -99,6 +102,7 @@ public final class ServerMatcher {
             return result;
         }
         boolean hookReported = false;
+        Consumer<MatchResult> mismatchConsumer = this.mismatchConsumer;
         if (mismatchConsumer != null) {
             try {
                 mismatchConsumer.accept(result);
@@ -121,7 +125,7 @@ public final class ServerMatcher {
         return result;
     }
 
-    boolean isSupported(String candidateVersion) {
+    boolean isSupported(@Nullable String candidateVersion) {
         if (candidateVersion == null || candidateVersion.isBlank()) {
             return false;
         }
@@ -151,7 +155,7 @@ public final class ServerMatcher {
      * {@code "26.3.1"} or {@code "26.3-pre1"} to {@code "26.3"}. Used to match any
      * patch, hotfix or prerelease of an allowed minor series.
      */
-    static String minorPrefix(String version) {
+    static @Nullable String minorPrefix(@Nullable String version) {
         if (version == null || version.isBlank()) {
             return null;
         }
@@ -210,25 +214,25 @@ public final class ServerMatcher {
     }
 
     public static final class Builder {
-        private final JavaPlugin plugin;
+        private final @Nullable JavaPlugin plugin;
         private final Set<String> exactVersions = new LinkedHashSet<>();
         private final List<VersionRange> ranges = new ArrayList<>();
         private final Set<String> minorSeries = new LinkedHashSet<>();
         private IncompatibleAction action = IncompatibleAction.ERROR_AND_DISABLE;
-        private Consumer<MatchResult> mismatchConsumer;
+        private @Nullable Consumer<MatchResult> mismatchConsumer;
 
-        private Builder(JavaPlugin plugin) {
+        private Builder(@Nullable JavaPlugin plugin) {
             this.plugin = plugin;
         }
 
-        public Builder allowVersion(String version) {
+        public Builder allowVersion(@Nullable String version) {
             if (version != null && !version.isBlank()) {
                 exactVersions.add(version.trim());
             }
             return this;
         }
 
-        public Builder allowVersions(Collection<String> versions) {
+        public Builder allowVersions(@Nullable Collection<String> versions) {
             if (versions != null) {
                 for (String v : versions) {
                     allowVersion(v);
@@ -237,7 +241,7 @@ public final class ServerMatcher {
             return this;
         }
 
-        public Builder allowRange(String minInclusive, String maxInclusive) {
+        public Builder allowRange(@Nullable String minInclusive, @Nullable String maxInclusive) {
             if ((minInclusive == null || minInclusive.isBlank())
                     && (maxInclusive == null || maxInclusive.isBlank())) {
                 return this;
@@ -251,7 +255,7 @@ public final class ServerMatcher {
          * {@code allowMinorSeries("26.3")} accepts {@code "26.3.1"}. Prefer this over
          * {@link #allowRange} with equal min/max, which rejects hotfixes.
          */
-        public Builder allowMinorSeries(String minorVersion) {
+        public Builder allowMinorSeries(@Nullable String minorVersion) {
             String prefix = minorPrefix(minorVersion);
             if (prefix != null) {
                 minorSeries.add(prefix);
@@ -259,14 +263,14 @@ public final class ServerMatcher {
             return this;
         }
 
-        public Builder incompatibleAction(IncompatibleAction action) {
+        public Builder incompatibleAction(@Nullable IncompatibleAction action) {
             if (action != null) {
                 this.action = action;
             }
             return this;
         }
 
-        public Builder onMismatch(Consumer<MatchResult> consumer) {
+        public Builder onMismatch(@Nullable Consumer<MatchResult> consumer) {
             this.mismatchConsumer = consumer;
             return this;
         }
@@ -292,24 +296,23 @@ public final class ServerMatcher {
             return joiner.toString();
         }
 
-        private String nullIfBlank(String value) {
+        private @Nullable String nullIfBlank(@Nullable String value) {
             return value == null || value.isBlank() ? null : value.trim();
         }
     }
 
     private static final class VersionRange {
-        private final String min;
-        private final String max;
+        private final @Nullable String min;
+        private final @Nullable String max;
 
-        private VersionRange(String min, String max) {
+        private VersionRange(@Nullable String min, @Nullable String max) {
             this.min = min;
             this.max = max;
         }
 
         private boolean contains(String candidate) {
-            if (candidate == null) {
-                return false;
-            }
+            String min = this.min;
+            String max = this.max;
             if (min != null && VersionComparator.compare(candidate, min) < 0) {
                 return false;
             }
@@ -320,6 +323,8 @@ public final class ServerMatcher {
         }
 
         private String describe() {
+            String min = this.min;
+            String max = this.max;
             if (min != null && max != null) {
                 return min + "-" + max;
             }

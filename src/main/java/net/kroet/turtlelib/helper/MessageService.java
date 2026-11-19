@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
@@ -16,6 +17,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jspecify.annotations.Nullable;
 
 /**
  * General MiniMessage-based localization helper shared across plugins.
@@ -57,11 +59,11 @@ public class MessageService {
     private volatile String prefixLabel;
     private volatile String currentLocale = LangLoader.DEFAULT_LOCALE;
     private Map<String, String> legacyKeyMigrations = Map.of();
-    private String legacyDefaultsRoot;
+    private @Nullable String legacyDefaultsRoot;
     private boolean bundledLocalesEnsured;
     private List<String> lastAddedKeys = List.of();
 
-    public MessageService(JavaPlugin plugin, String defaultPrefixRaw, String defaultPrefixLabel) {
+    public MessageService(JavaPlugin plugin, @Nullable String defaultPrefixRaw, @Nullable String defaultPrefixLabel) {
         this.plugin = plugin;
         this.defaultPrefixRaw = defaultPrefixRaw != null && !defaultPrefixRaw.isBlank()
                 ? defaultPrefixRaw
@@ -82,7 +84,7 @@ public class MessageService {
      * {@link #load} and {@link #syncLocaleFile}; call it before the first load. A
      * rejected rename list throws {@link IllegalArgumentException} right here.
      */
-    public void setLegacyKeyMigrations(Map<String, String> legacyKeyMigrations) {
+    public void setLegacyKeyMigrations(@Nullable Map<String, String> legacyKeyMigrations) {
         LangLoader.checkRenames(legacyKeyMigrations);
         this.legacyKeyMigrations = legacyKeyMigrations == null
                 ? Map.of()
@@ -93,11 +95,11 @@ public class MessageService {
      * Jar folder with the old version's lang files as {@code lang/<locale>.yml}; an
      * old key left next to its renamed key is removed while it has the old text.
      */
-    public void setLegacyDefaultsRoot(String jarFolder) {
+    public void setLegacyDefaultsRoot(@Nullable String jarFolder) {
         this.legacyDefaultsRoot = jarFolder == null || jarFolder.endsWith("/") ? jarFolder : jarFolder + "/";
     }
 
-    public void load(String locale) {
+    public void load(@Nullable String locale) {
         String normalized = LangLoader.resolveLocale(plugin, locale);
         currentLocale = normalized;
         // The other bundled locales only need to exist once per plugin run.
@@ -143,7 +145,7 @@ public class MessageService {
             }
             String value = section.getString(key, fullKey);
             String converted = legacyToMiniMessage(value);
-            if (!converted.equals(value)) {
+            if (!Objects.equals(converted, value)) {
                 legacyKeys.add(fullKey);
             }
             messages.put(fullKey, converted);
@@ -155,7 +157,7 @@ public class MessageService {
      * MiniMessage would otherwise reject with an exception; a color resets the
      * formats before it, as in legacy text. Other text stays as it is.
      */
-    static String legacyToMiniMessage(String text) {
+    static @Nullable String legacyToMiniMessage(@Nullable String text) {
         if (text == null || text.indexOf(LEGACY_CHAR) < 0) {
             return text;
         }
@@ -187,7 +189,7 @@ public class MessageService {
     }
 
     // Reads the six digits of a §x§R§R§G§G§B§B hex color starting at index start.
-    private static String legacyHex(String text, int start) {
+    private static @Nullable String legacyHex(String text, int start) {
         if (start + 13 >= text.length() || Character.toLowerCase(text.charAt(start + 1)) != 'x') {
             return null;
         }
@@ -210,7 +212,7 @@ public class MessageService {
         return lastAddedKeys;
     }
 
-    public List<String> syncLocaleFile(String locale) {
+    public List<String> syncLocaleFile(@Nullable String locale) {
         return LangLoader.syncLocale(plugin, locale, legacyKeyMigrations, legacyDefaultsRoot);
     }
 
@@ -218,7 +220,7 @@ public class MessageService {
         return currentLocale;
     }
 
-    public void setPrefixLabel(String label) {
+    public void setPrefixLabel(@Nullable String label) {
         if (label == null || label.isBlank()) {
             this.prefixLabel = this.defaultPrefixLabel;
         } else {
@@ -226,7 +228,7 @@ public class MessageService {
         }
     }
 
-    private TagResolver prefixResolvers(TagResolver... extra) {
+    private TagResolver prefixResolvers(@Nullable TagResolver @Nullable... extra) {
         TagResolver.Builder builder = TagResolver.builder();
         builder.resolver(Placeholder.parsed(PREFIX_PLACEHOLDER, prefixRaw));
         builder.resolver(Placeholder.unparsed(PREFIX_LABEL_PLACEHOLDER, prefixLabel));
@@ -245,7 +247,7 @@ public class MessageService {
         return MINI.deserialize(raw, prefixResolvers());
     }
 
-    public Component format(String key, Map<String, String> replacements) {
+    public Component format(String key, @Nullable Map<String, String> replacements) {
         String raw = messages.getOrDefault(key, key);
         TagResolver.Builder builder = TagResolver.builder();
         builder.resolver(prefixResolvers());
@@ -261,7 +263,7 @@ public class MessageService {
         return PLAIN.serialize(component(key));
     }
 
-    public String plain(String key, Map<String, String> replacements) {
+    public String plain(String key, @Nullable Map<String, String> replacements) {
         if (replacements == null || replacements.isEmpty()) {
             return plain(key);
         }
@@ -269,6 +271,7 @@ public class MessageService {
     }
 
     public void reload(FileConfiguration config) {
+        @Nullable
         String lang = config.getString("language", currentLocale);
         load(lang);
     }
@@ -282,7 +285,7 @@ public class MessageService {
         log(logger, level, key, Map.of());
     }
 
-    public void log(Logger logger, Level level, String key, Map<String, String> replacements) {
+    public void log(Logger logger, Level level, String key, @Nullable Map<String, String> replacements) {
         logger.log(level, plain(key, replacements));
     }
 }

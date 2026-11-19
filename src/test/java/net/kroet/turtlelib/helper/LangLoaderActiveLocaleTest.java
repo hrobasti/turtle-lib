@@ -26,6 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -54,6 +55,8 @@ class LangLoaderActiveLocaleTest {
     private static final Map<String, String> BUNDLED = Map.of("lang/en_US.yml", BUNDLED_EN, "lang/de_DE.yml",
             BUNDLED_DE, "legacy/1.x/lang/de_DE.yml", "command:\n  reload-done: Konfiguration neu geladen\n");
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path dataFolder;
 
@@ -281,7 +284,7 @@ class LangLoaderActiveLocaleTest {
         }
 
         @Override
-        public InputStream resource(String path) {
+        public @Nullable InputStream resource(String path) {
             String text = bundled.get(path);
             return text == null ? null : new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8));
         }
@@ -324,6 +327,8 @@ class LangLoaderActiveLocaleTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord logRecord) {
                 records.add(logRecord);

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +40,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import org.jspecify.annotations.Nullable;
 
 public class UpdateChecker {
     /**
@@ -67,27 +69,27 @@ public class UpdateChecker {
 
     // Own daemon pool and HTTP client, made on first use, closed by shutdown();
     // idle threads end by themselves, so a /reload leaves none behind.
-    private static Http http;
+    private static @Nullable Http http;
 
-    private final Plugin plugin;
+    private final @Nullable Plugin plugin; // null only in the test constructor
     private final int providerMode; // 0 both, 1 modrinth, 2 hangar
     private final boolean includePrereleases;
     private final boolean filterByServerVersion;
-    private final String modrinthSlug;
-    private final String hangarNamespace;
-    private final String userAgent;
-    private final String minecraftVersionLower;
-    private final String minecraftVersionPrefixLower;
+    private final @Nullable String modrinthSlug;
+    private final @Nullable String hangarNamespace;
+    private final @Nullable String userAgent;
+    private final @Nullable String minecraftVersionLower;
+    private final @Nullable String minecraftVersionPrefixLower;
     private volatile boolean logFailures = true;
 
     public UpdateChecker(Plugin plugin, int providerMode, boolean includePrereleases,
-            String modrinthSlug, String hangarNamespace) {
+            @Nullable String modrinthSlug, @Nullable String hangarNamespace) {
         this(plugin, providerMode, includePrereleases, false, modrinthSlug, hangarNamespace);
     }
 
     public UpdateChecker(Plugin plugin, int providerMode, boolean includePrereleases,
             boolean filterByServerVersion,
-            String modrinthSlug, String hangarNamespace) {
+            @Nullable String modrinthSlug, @Nullable String hangarNamespace) {
         if (providerMode < 0 || providerMode > 2) {
             throw new IllegalArgumentException("providerMode must be 0 (both), 1 (Modrinth) or 2 (Hangar), got "
                     + providerMode);
@@ -110,7 +112,7 @@ public class UpdateChecker {
      * {@code select*}/{@code *Compatibility} logic reads, so
      * {@code UpdateCheckerFixtureTest} can exercise it without a {@code Plugin}.
      */
-    UpdateChecker(boolean includePrereleases, boolean filterByServerVersion, String minecraftVersion) {
+    UpdateChecker(boolean includePrereleases, boolean filterByServerVersion, @Nullable String minecraftVersion) {
         this.plugin = null;
         this.providerMode = 0;
         this.includePrereleases = includePrereleases;
@@ -131,7 +133,8 @@ public class UpdateChecker {
     }
 
     static synchronized Http http() {
-        if (http == null) {
+        Http current = http;
+        if (current == null) {
             ThreadPoolExecutor executor = new ThreadPoolExecutor(2, 2, 30L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
                     runnable -> {
                         Thread thread = new Thread(runnable, "turtle-lib-UpdateChecker");
@@ -144,9 +147,10 @@ public class UpdateChecker {
                     .followRedirects(HttpClient.Redirect.NEVER)
                     .executor(executor)
                     .build();
-            http = new Http(client, executor);
+            current = new Http(client, executor);
+            http = current;
         }
-        return http;
+        return current;
     }
 
     /**
@@ -162,9 +166,10 @@ public class UpdateChecker {
      * running checks end quietly, and a later check starts fresh ones.
      */
     public static synchronized void shutdown() {
-        if (http != null) {
-            http.client().shutdownNow();
-            http.executor().shutdownNow();
+        Http current = http;
+        if (current != null) {
+            current.client().shutdownNow();
+            current.executor().shutdownNow();
             http = null;
         }
     }
@@ -174,6 +179,7 @@ public class UpdateChecker {
      * completes on the checker's own thread, not the Bukkit main thread.
      */
     public CompletableFuture<UpdateInfo> checkAsync() {
+        Plugin plugin = Objects.requireNonNull(this.plugin, "plugin");
         String current = plugin.getPluginMeta().getVersion();
         Http http = http();
         List<CompletableFuture<ProviderResult>> checks = new ArrayList<>();
@@ -198,13 +204,14 @@ public class UpdateChecker {
                 });
     }
 
-    public record UpdateInfo(String currentVersion, String latestVersion, List<ProviderResult> providers) {
+    public record UpdateInfo(String currentVersion, @Nullable String latestVersion, List<ProviderResult> providers) {
         public boolean hasUpdate() {
             return latestVersion != null && !latestVersion.isBlank();
         }
     }
 
-    public record ProviderResult(Provider provider, String latestVersion, String url, String errorMessage, JsonObject metadata,
+    public record ProviderResult(Provider provider, @Nullable String latestVersion, String url, @Nullable String errorMessage,
+            @Nullable JsonObject metadata,
             boolean compatibilityUnknown) {
         public boolean success() {
             return errorMessage == null;
@@ -240,7 +247,7 @@ public class UpdateChecker {
      * error, so a plugin published on one platform only can still use mode 0.
      * Package-private for UpdateCheckerTest.
      */
-    static List<Provider> providersToCheck(int providerMode, String modrinthSlug, String hangarNamespace) {
+    static List<Provider> providersToCheck(int providerMode, @Nullable String modrinthSlug, @Nullable String hangarNamespace) {
         List<Provider> providers = new ArrayList<>(2);
         if (providerMode == 1 || providerMode == 0 && isConfigured(modrinthSlug)) {
             providers.add(Provider.MODRINTH);
@@ -251,7 +258,7 @@ public class UpdateChecker {
         return providers;
     }
 
-    private static boolean isConfigured(String id) {
+    private static boolean isConfigured(@Nullable String id) {
         return id != null && !id.isBlank();
     }
 
@@ -273,10 +280,11 @@ public class UpdateChecker {
     }
 
     private CompletableFuture<ProviderResult> fetchHangarStatusAsync(Http http) {
-        if (!isConfigured(hangarNamespace)) {
+        String namespace = hangarNamespace;
+        if (namespace == null || !isConfigured(namespace)) {
             return CompletableFuture.completedFuture(errorResult(Provider.HANGAR, "No project namespace configured"));
         }
-        return fetchHangarVersionsAsync(url -> fetchJsonAsync(url, http), hangarNamespace, 0, new JsonArray())
+        return fetchHangarVersionsAsync(url -> fetchJsonAsync(url, http), namespace, 0, new JsonArray())
                 .thenApply(this::selectHangarFromArray)
                 .thenApply(selected -> {
                     if (selected == null) {
@@ -340,7 +348,7 @@ public class UpdateChecker {
     private ProviderResult failedResult(Provider provider, Throwable failure, Http http) {
         String reason = describeFailure(failure);
         if (logFailures && !http.stopped()) {
-            plugin.getLogger().warning(provider.displayName() + " update check failed: " + reason);
+            Objects.requireNonNull(plugin, "plugin").getLogger().warning(provider.displayName() + " update check failed: " + reason);
         }
         return errorResult(provider, reason);
     }
@@ -388,7 +396,7 @@ public class UpdateChecker {
         return new ProviderResult(provider, null, providerBaseUrl(provider), null, null, false);
     }
 
-    static String findNewestAvailableVersion(String current, List<ProviderResult> providers) {
+    static @Nullable String findNewestAvailableVersion(String current, List<ProviderResult> providers) {
         String latest = null;
         for (ProviderResult result : providers) {
             String candidate = result.latestVersion();
@@ -408,7 +416,7 @@ public class UpdateChecker {
      * extra path segments into the request URL. Invalid values are logged and
      * treated as "not configured" instead of failing startup.
      */
-    static String sanitizeSlug(Logger logger, String slug) {
+    static @Nullable String sanitizeSlug(Logger logger, @Nullable String slug) {
         if (slug == null || slug.isBlank()) {
             return slug;
         }
@@ -424,7 +432,7 @@ public class UpdateChecker {
      * Same idea as {@link #sanitizeSlug}, for Hangar's {@code User/Project}
      * namespace format.
      */
-    static String sanitizeNamespace(Logger logger, String namespace) {
+    static @Nullable String sanitizeNamespace(Logger logger, @Nullable String namespace) {
         if (namespace == null || namespace.isBlank()) {
             return namespace;
         }
@@ -486,7 +494,7 @@ public class UpdateChecker {
         private final long limit;
         private final CompletableFuture<byte[]> body = new CompletableFuture<>();
         private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        private Flow.Subscription subscription;
+        private Flow.@Nullable Subscription subscription;
 
         LimitedBody(long limit) {
             this.limit = limit;
@@ -497,12 +505,16 @@ public class UpdateChecker {
             return body;
         }
 
+        // Flow.Subscriber has no null annotations; the HTTP client never passes null.
+        @SuppressWarnings("null")
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
             this.subscription = subscription;
             subscription.request(Long.MAX_VALUE);
         }
 
+        // Flow.Subscriber has no null annotations; the HTTP client never passes null.
+        @SuppressWarnings("null")
         @Override
         public void onNext(List<ByteBuffer> buffers) {
             if (body.isDone()) {
@@ -510,7 +522,7 @@ public class UpdateChecker {
             }
             for (ByteBuffer buffer : buffers) {
                 if (bytes.size() + (long) buffer.remaining() > limit) {
-                    subscription.cancel();
+                    Objects.requireNonNull(subscription, "subscription").cancel();
                     body.completeExceptionally(new IOException("Response exceeded " + limit + " bytes"));
                     return;
                 }
@@ -520,6 +532,8 @@ public class UpdateChecker {
             }
         }
 
+        // Flow.Subscriber has no null annotations; the HTTP client never passes null.
+        @SuppressWarnings("null")
         @Override
         public void onError(Throwable throwable) {
             body.completeExceptionally(throwable);
@@ -535,6 +549,7 @@ public class UpdateChecker {
      * Picks the highest eligible version out of a Modrinth version list, or
      * {@code null} if none qualifies. Package-private for UpdateCheckerFixtureTest.
      */
+    @Nullable
     SelectedVersion selectModrinthVersion(JsonElement el) {
         JsonArray entries = el.isJsonArray() ? el.getAsJsonArray() : new JsonArray();
         return selectHighest(entries, "version_number", this::isModrinthPrerelease, this::modrinthCompatibility);
@@ -542,7 +557,7 @@ public class UpdateChecker {
 
     // The highest version by VersionComparator, not the first in the provider's
     // order; one without compatibility data only if nothing matches.
-    private SelectedVersion selectHighest(JsonArray entries, String nameKey, Predicate<JsonObject> prerelease,
+    private @Nullable SelectedVersion selectHighest(JsonArray entries, String nameKey, Predicate<JsonObject> prerelease,
             Function<JsonObject, Compatibility> compatibility) {
         JsonObject best = null;
         JsonObject bestUnknown = null;
@@ -568,14 +583,14 @@ public class UpdateChecker {
         return bestUnknown == null ? null : new SelectedVersion(bestUnknown, true);
     }
 
-    private static String versionName(JsonObject version, String key) {
+    private static @Nullable String versionName(JsonObject version, String key) {
         JsonElement name = version.get(key);
         return name != null && name.isJsonPrimitive() ? name.getAsString() : null;
     }
 
     // The entry's version name if the checker may report it, else null (the entry
     // is skipped).
-    static String usableVersionName(JsonObject version, String key) {
+    static @Nullable String usableVersionName(JsonObject version, String key) {
         String name = versionName(version, key);
         return name != null && name.length() <= MAX_VERSION_NAME && VERSION_NAME.matcher(name).matches() ? name : null;
     }
@@ -603,11 +618,12 @@ public class UpdateChecker {
      * Picks the highest eligible version out of a Hangar version list, or
      * {@code null} if none qualifies. Package-private for UpdateCheckerFixtureTest.
      */
+    @Nullable
     SelectedVersion selectHangarVersion(JsonElement el) {
         return selectHangarFromArray(hangarEntries(el));
     }
 
-    private SelectedVersion selectHangarFromArray(JsonArray arr) {
+    private @Nullable SelectedVersion selectHangarFromArray(JsonArray arr) {
         return selectHighest(arr, "name", this::isHangarPrerelease, this::hangarCompatibility);
     }
 
@@ -631,7 +647,7 @@ public class UpdateChecker {
 
     // Hangar maps each platform to its supported game versions, e.g.
     // "platformDependencies": {"PAPER": ["26.2"]}.
-    private JsonArray hangarPaperVersions(JsonObject version) {
+    private @Nullable JsonArray hangarPaperVersions(JsonObject version) {
         JsonElement deps = version.get("platformDependencies");
         if (deps == null || !deps.isJsonObject()) {
             return null;
@@ -755,7 +771,9 @@ public class UpdateChecker {
         return false;
     }
 
-    private boolean matchesVersionToken(String value) {
+    private boolean matchesVersionToken(@Nullable String value) {
+        String minecraftVersionLower = this.minecraftVersionLower;
+        String minecraftVersionPrefixLower = this.minecraftVersionPrefixLower;
         if (value == null || minecraftVersionLower == null) {
             return false;
         }
@@ -785,7 +803,7 @@ public class UpdateChecker {
         return false;
     }
 
-    private String safeMinecraftVersion() {
+    private @Nullable String safeMinecraftVersion() {
         try {
             return Bukkit.getMinecraftVersion();
         } catch (Throwable ignored) {
@@ -793,18 +811,19 @@ public class UpdateChecker {
         }
     }
 
-    private String normalizeMinecraftVersion(String version) {
+    private @Nullable String normalizeMinecraftVersion(@Nullable String version) {
         if (version == null) {
             return null;
         }
-        int dash = version.indexOf('-');
+        String release = version;
+        int dash = release.indexOf('-');
         if (dash > 0) {
-            version = version.substring(0, dash);
+            release = release.substring(0, dash);
         }
-        return version.trim();
+        return release.trim();
     }
 
-    private String deriveMinorPrefix(String version) {
+    private @Nullable String deriveMinorPrefix(@Nullable String version) {
         if (version == null) {
             return null;
         }

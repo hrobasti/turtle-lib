@@ -38,6 +38,9 @@ dependencies {
     // Gson and Adventure come with paper-api (compileOnly, provided by Paper at runtime),
     // so they are never bundled and need no version of their own here.
     compileOnly(libs.paper.api)
+    // Null annotations only (skill java-null-safety); never shipped.
+    compileOnlyApi(libs.jspecify)
+    testCompileOnly(libs.jspecify)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -140,3 +143,7 @@ publishing {
         }
     }
 }
+
+// JSpecify null gate with the Eclipse compiler (skill java-null-safety); wired into `check`.
+apply from: 'gradle/null_check.gradle'
+registerNullAnalysis(25)

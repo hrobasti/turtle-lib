@@ -11,11 +11,13 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Line-level view of a YAML file for the raw-text config helpers: each line
@@ -40,20 +42,28 @@ final class YamlLines {
 
     // path is null for lines that aren't keys or sit inside a list item; end
     // includes the line break. key is set for key lines and "- key: value" items.
-    record Line(Kind kind, int indent, String content, String path, int start, int end, Key key) {
+    record Line(Kind kind, int indent, String content, @Nullable String path, int start, int end, @Nullable Key key) {
+        // For lines known to be key lines.
+        Key requireKey() {
+            return Objects.requireNonNull(key, "not a key line");
+        }
     }
 
     /**
      * A mapping key: unquoted name, token span in the text, column, id of the block
      * it belongs to (siblings share it) and its parent's path (null inside lists).
      */
-    record Key(String name, int start, int end, int column, int owner, String parent) {
+    record Key(String name, int start, int end, int column, int owner, @Nullable String parent) {
+        // For keys known to have a path (not inside a list).
+        String requireParent() {
+            return Objects.requireNonNull(parent, "key inside a list");
+        }
     }
 
     record Parsed(List<Line> lines, int indentStep) {
     }
 
-    private record Open(int indent, int id, String path) {
+    private record Open(int indent, int id, @Nullable String path) {
     }
 
     private YamlLines() {
@@ -65,11 +75,12 @@ final class YamlLines {
 
     // For text holding a file's raw bytes as ISO-8859-1 chars: key names and paths
     // are decoded with the file's charset.
-    static Parsed parse(String text, Charset charset) {
+    static Parsed parse(String text, @Nullable Charset charset) {
         List<Line> lines = new ArrayList<>();
         Deque<Open> open = new ArrayDeque<>();
         int indentStep = 0;
         int nextId = 0;
+        @Nullable
         Value value = null; // a value continuing on the following lines
         for (int start = 0; start < text.length();) {
             int newline = text.indexOf('\n', start);
@@ -97,9 +108,12 @@ final class YamlLines {
                 value = null;
             }
             Kind kind;
+            @Nullable
             String path = null;
+            @Nullable
             Key key = null;
             Matcher item = LIST_ITEM.matcher(raw);
+            @Nullable
             KeyMatch keyLine;
             if (trimmed.isEmpty()) {
                 kind = Kind.BLANK;
@@ -126,6 +140,7 @@ final class YamlLines {
                 popTo(open, indent);
                 String name = name(keyLine.token(raw), charset);
                 Open parent = open.peek();
+                @Nullable
                 String parentPath = parent == null ? "" : parent.path();
                 if (parentPath != null) {
                     path = parentPath.isEmpty() ? name : parentPath + "." + name;
@@ -161,13 +176,13 @@ final class YamlLines {
         }
 
         // The kind of the line if it still belongs to the value, else null.
-        abstract Kind take(String raw, int indent, String trimmed);
+        abstract @Nullable Kind take(String raw, int indent, String trimmed);
 
         Value next() {
             return this;
         }
 
-        static Value open(String rest, int ownerIndent) {
+        static @Nullable Value open(String rest, int ownerIndent) {
             String value = rest.strip();
             value = value.substring(propertiesEnd(value));
             if (value.isEmpty() || value.startsWith("#")) {
@@ -200,6 +215,7 @@ final class YamlLines {
         }
 
         @Override
+        @Nullable
         Kind take(String raw, int indent, String trimmed) {
             if (trimmed.isEmpty()) {
                 return Kind.BLANK;
@@ -239,6 +255,7 @@ final class YamlLines {
         }
 
         @Override
+        @Nullable
         Kind take(String raw, int indent, String trimmed) {
             scan(raw, 0);
             return trimmed.isEmpty() ? Kind.BLANK : Kind.VALUE;
@@ -294,6 +311,7 @@ final class YamlLines {
         }
 
         @Override
+        @Nullable
         Kind take(String raw, int indent, String trimmed) {
             if (depth > 0) {
                 scan(raw);
@@ -377,7 +395,7 @@ final class YamlLines {
 
     // "key: value", "'key': value" or "\"key\": value" with any YAML plain key;
     // scanned char by char, so any line length works.
-    static KeyMatch matchKey(String line) {
+    static @Nullable KeyMatch matchKey(String line) {
         int length = line.length();
         int start = 0;
         while (start < length && isBlank(line.charAt(start))) {
@@ -444,7 +462,7 @@ final class YamlLines {
     }
 
     // The key match if blanks, a ':' and a blank or the line end follow tokenEnd.
-    private static KeyMatch colonAt(String line, int tokenStart, int tokenEnd) {
+    private static @Nullable KeyMatch colonAt(String line, int tokenStart, int tokenEnd) {
         int i = tokenEnd;
         while (i < line.length() && isBlank(line.charAt(i))) {
             i++;
@@ -505,7 +523,7 @@ final class YamlLines {
     }
 
     // Double-quoted key; code points the encoder (if any) can't store are escaped.
-    static String quotedKey(String name, CharsetEncoder encoder) {
+    static String quotedKey(String name, @Nullable CharsetEncoder encoder) {
         StringBuilder quoted = new StringBuilder("\"");
         name.codePoints().forEach(codePoint -> {
             if (codePoint == '"' || codePoint == '\\') {
@@ -561,7 +579,7 @@ final class YamlLines {
     }
 
     /** Returns {@code null} if the text isn't valid YAML. */
-    static YamlConfiguration parseYaml(String text) {
+    static @Nullable YamlConfiguration parseYaml(String text) {
         YamlConfiguration yaml = new YamlConfiguration();
         try {
             yaml.loadFromString(stripBom(text));
@@ -572,7 +590,7 @@ final class YamlLines {
     }
 
     /** Why the text isn't valid YAML (see {@link #describeYamlError}), or null. */
-    static String yamlError(String text) {
+    static @Nullable String yamlError(String text) {
         try {
             new YamlConfiguration().loadFromString(stripBom(text));
             return null;
@@ -606,7 +624,7 @@ final class YamlLines {
         }
     }
 
-    private static String name(String token, Charset charset) {
+    private static String name(String token, @Nullable Charset charset) {
         return unquote(charset == null ? token : new String(token.getBytes(StandardCharsets.ISO_8859_1), charset));
     }
 

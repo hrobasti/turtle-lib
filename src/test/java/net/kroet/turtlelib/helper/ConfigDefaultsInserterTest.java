@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -46,6 +47,8 @@ class ConfigDefaultsInserterTest {
             "last: \"end\"",
             "");
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path tempDir;
 
@@ -61,6 +64,8 @@ class ConfigDefaultsInserterTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord record) {
                 warnings.add(record.getMessage());
@@ -386,7 +391,7 @@ class ConfigDefaultsInserterTest {
         assertEquals(List.of("section.motd"), insert(file, defaults, new ArrayList<>()));
 
         assertEquals("first: 1\nsection:\n  other: x\n  motd: |\n      Hello\n        World\n", Files.readString(file));
-        assertEquals("Hello\n  World\n", YamlLines.parseYaml(Files.readString(file)).getString("section.motd"));
+        assertEquals("Hello\n  World\n", Objects.requireNonNull(YamlLines.parseYaml(Files.readString(file))).getString("section.motd"));
     }
 
     @Test

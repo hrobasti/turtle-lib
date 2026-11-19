@@ -13,3 +13,4 @@ Never part of the TurtleLib jar; versions in `gradle/libs.versions.toml`:
 
 - Provided at runtime by Paper: the Paper API (Paper's own license terms) with Adventure and MiniMessage (MIT) and Gson (Apache-2.0). Plugins that use TurtleLib get them the same way and do not shade them.
 - Used only for tests: JUnit 6 (Jupiter and Platform Launcher; EPL-2.0).
+- Used only for the build's null check: the JSpecify annotations (Apache-2.0, compile-only) and the Eclipse compiler ECJ (EPL-2.0).

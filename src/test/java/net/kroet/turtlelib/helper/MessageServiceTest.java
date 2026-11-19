@@ -26,6 +26,7 @@ class MessageServiceTest {
     private static final String S = String.valueOf((char) 0xA7); // the section sign
 
     private static MessageService service(String defaultPrefix, String yaml) throws InvalidConfigurationException {
+        @SuppressWarnings("null") // test-only: no plugin
         MessageService service = new MessageService(null, defaultPrefix, "Demo");
         service.useMessages(yaml(yaml));
         return service;
@@ -39,6 +40,7 @@ class MessageServiceTest {
 
     @Test
     void renameListsAreCheckedWhenTheyAreSet() {
+        @SuppressWarnings("null") // test-only: no plugin
         MessageService service = new MessageService(null, DEFAULT_PREFIX, "Demo");
 
         assertThrows(IllegalArgumentException.class, () -> service.setLegacyKeyMigrations(
@@ -108,6 +110,7 @@ class MessageServiceTest {
         YamlConfiguration lang = yaml("command: Mein Text\n");
         lang.setDefaults(yaml("command:\n  reload: Reloaded\n  help: Help\n"));
         lang.options().copyDefaults(true);
+        @SuppressWarnings("null") // test-only: no plugin
         MessageService service = new MessageService(null, DEFAULT_PREFIX, "Demo");
 
         service.useMessages(lang);
@@ -187,6 +190,8 @@ class MessageServiceTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord logRecord) {
                 records.add(logRecord);

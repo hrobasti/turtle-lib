@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Orders versions like "1.4.0", "1.4.0-beta2" or "26.3.build.30". Format and
@@ -18,18 +19,18 @@ public final class VersionComparator {
     private VersionComparator() {
     }
 
-    public static int compare(String a, String b) {
+    public static int compare(@Nullable String a, @Nullable String b) {
         Version va = Version.parse(a);
         Version vb = Version.parse(b);
         return va.compareTo(vb);
     }
 
-    public static boolean isGreater(String a, String b) {
+    public static boolean isGreater(@Nullable String a, @Nullable String b) {
         return compare(a, b) > 0;
     }
 
     // Whether the version carries a prerelease label, like 1.4.0-beta2 or 1.4.0rc1.
-    static boolean isPrerelease(String version) {
+    static boolean isPrerelease(@Nullable String version) {
         return Version.parse(version).pre != null;
     }
 
@@ -53,20 +54,20 @@ public final class VersionComparator {
         return !s.isEmpty() && s.chars().allMatch(Character::isDigit);
     }
 
-    static final class Version implements Comparable<Version> {
+    static final class Version {
         final List<String> nums;
-        final String letterSuffix; // e.g., "a", "b" from main segment like 1.0a
+        final @Nullable String letterSuffix; // e.g., "a", "b" from main segment like 1.0a
         final List<String> buildNums; // numbers of "build.30" or "+build.30" -> [30]
-        final Pre pre; // prerelease like alpha, beta, rc with optional number
+        final @Nullable Pre pre; // prerelease like alpha, beta, rc with optional number
 
-        Version(List<String> nums, String letterSuffix, List<String> buildNums, Pre pre) {
+        Version(List<String> nums, @Nullable String letterSuffix, List<String> buildNums, @Nullable Pre pre) {
             this.nums = nums;
             this.letterSuffix = letterSuffix;
             this.buildNums = buildNums;
             this.pre = pre;
         }
 
-        static Version parse(String s) {
+        static Version parse(@Nullable String s) {
             String lower = s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
             if (lower.length() > 1 && lower.charAt(0) == 'v' && Character.isDigit(lower.charAt(1)))
                 lower = lower.substring(1);
@@ -153,31 +154,34 @@ public final class VersionComparator {
             return true;
         }
 
-        @Override
-        public int compareTo(Version o) {
+        int compareTo(Version o) {
             // 1) compare numeric parts
             int c = compareNumberLists(this.nums, o.nums);
             if (c != 0)
                 return c;
             // 2) compare letter suffix on main version (e.g., 1.0a > 1.0)
-            boolean aHas = this.letterSuffix != null && !this.letterSuffix.isEmpty();
-            boolean bHas = o.letterSuffix != null && !o.letterSuffix.isEmpty();
+            String la = this.letterSuffix;
+            String lb = o.letterSuffix;
+            boolean aHas = la != null && !la.isEmpty();
+            boolean bHas = lb != null && !lb.isEmpty();
             if (aHas && !bHas)
                 return 1;
             if (!aHas && bHas)
                 return -1;
-            if (aHas && bHas) {
-                c = this.letterSuffix.compareTo(o.letterSuffix);
+            if (la != null && lb != null && aHas && bHas) {
+                c = la.compareTo(lb);
                 if (c != 0)
                     return c;
             }
             // 3) compare prerelease (release > prerelease)
-            if (this.pre == null && o.pre != null)
+            Pre pa = this.pre;
+            Pre pb = o.pre;
+            if (pa == null && pb != null)
                 return 1;
-            if (this.pre != null && o.pre == null)
+            if (pa != null && pb == null)
                 return -1;
-            if (this.pre != null) {
-                c = this.pre.compareTo(o.pre);
+            if (pa != null && pb != null) {
+                c = pa.compareTo(pb);
                 if (c != 0)
                     return c;
             }
@@ -196,18 +200,18 @@ public final class VersionComparator {
             return 0;
         }
 
-        static final class Pre implements Comparable<Pre> {
-            final String label; // alpha, beta, rc, others; null if it starts with a number
+        static final class Pre {
+            final @Nullable String label; // alpha, beta, rc, others; null if it starts with a number
             final List<String> parts; // what follows the label, e.g. beta.2 -> [2]
 
-            Pre(String label, List<String> parts) {
+            Pre(@Nullable String label, List<String> parts) {
                 this.label = label;
                 this.parts = parts;
             }
 
             // Splits at ".", "-", "_" and wherever letters and digits meet, so beta2,
             // beta.2, beta-2 and beta_2 read alike.
-            static Pre parse(String s) {
+            static @Nullable Pre parse(@Nullable String s) {
                 if (s == null || s.isEmpty())
                     return null;
                 List<String> tokens = new ArrayList<>();
@@ -238,7 +242,7 @@ public final class VersionComparator {
             }
 
             // Minecraft's order: alpha < beta < pre < rc.
-            static int rank(String name) {
+            static int rank(@Nullable String name) {
                 if (name == null)
                     return 4;
                 switch (name) {
@@ -257,19 +261,20 @@ public final class VersionComparator {
                 }
             }
 
-            @Override
-            public int compareTo(Pre o) {
-                int ra = rank(this.label);
-                int rb = rank(o.label);
+            int compareTo(Pre o) {
+                String la = this.label;
+                String lb = o.label;
+                int ra = rank(la);
+                int rb = rank(lb);
                 if (ra != rb)
                     return Integer.compare(ra, rb);
-                if (!Objects.equals(this.label, o.label)) {
+                if (!Objects.equals(la, lb)) {
                     // same rank, different labels: a bare number first, then by name
-                    if (this.label == null)
+                    if (la == null)
                         return -1;
-                    if (o.label == null)
+                    if (lb == null)
                         return 1;
-                    return this.label.compareTo(o.label);
+                    return la.compareTo(lb);
                 }
                 int max = Math.max(this.parts.size(), o.parts.size());
                 for (int i = 0; i < max; i++) {

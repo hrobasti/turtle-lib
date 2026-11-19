@@ -28,6 +28,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Checks a plugin's bundled lang files against its base locale and the keys its
@@ -103,7 +104,7 @@ public final class LocaleFileChecker {
     }
 
     private final Path langDir;
-    private final String configuredBase; // null: chosen like LangLoader does
+    private final @Nullable String configuredBase; // null: chosen like LangLoader does
     private final Set<String> placeholders;
     private final Map<String, String> usedKeys;
     private final List<Path> sourceRoots;
@@ -425,7 +426,7 @@ public final class LocaleFileChecker {
     public static final class Builder {
 
         private final Path langDir;
-        private String baseLocale;
+        private @Nullable String baseLocale;
         private final Set<String> placeholders = new LinkedHashSet<>(LIBRARY_PLACEHOLDERS);
         private final Map<String, String> usedKeys = new LinkedHashMap<>();
         private final List<Path> sourceRoots = new ArrayList<>();

@@ -27,6 +27,7 @@ import net.kroet.turtlelib.helper.YamlLines.Parsed;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Adds keys the bundled default file has but the server's copy lacks, as raw
@@ -45,7 +46,7 @@ public final class ConfigDefaultsInserter {
      * their dotted paths (empty if none). A missing section comes whole; keys under
      * a plain value or an inline section like {@code {key: value}} are skipped.
      */
-    public static List<String> insertMissingKeys(File file, InputStream defaults, Logger logger, String fileLabel) {
+    public static List<String> insertMissingKeys(@Nullable File file, @Nullable InputStream defaults, @Nullable Logger logger, String fileLabel) {
         return insertMissingKeys(file, defaults, logger, fileLabel, List.of());
     }
 
@@ -54,7 +55,7 @@ public final class ConfigDefaultsInserter {
      * inside {@code openSections} each default key is offered only once (tracked in
      * {@value #SEEN_FILE}), so entries the admin deleted stay deleted.
      */
-    public static List<String> insertMissingKeys(File file, InputStream defaults, Logger logger, String fileLabel,
+    public static List<String> insertMissingKeys(@Nullable File file, @Nullable InputStream defaults, @Nullable Logger logger, String fileLabel,
             Collection<String> openSections) {
         return insertMissingKeys(file, defaults, logger, fileLabel, openSections, false);
     }
@@ -62,7 +63,7 @@ public final class ConfigDefaultsInserter {
     // With skipUnencodable, a key whose block still has characters the file's
     // encoding can't store is skipped with a warning instead of written with '?'.
     // Any failure, even a stack overflow while parsing, leaves the file unchanged.
-    static List<String> insertMissingKeys(File file, InputStream defaults, Logger logger, String fileLabel,
+    static List<String> insertMissingKeys(@Nullable File file, @Nullable InputStream defaults, @Nullable Logger logger, String fileLabel,
             Collection<String> openSections, boolean skipUnencodable) {
         try {
             return addMissingKeys(file, defaults, logger, fileLabel, openSections, skipUnencodable);
@@ -72,7 +73,7 @@ public final class ConfigDefaultsInserter {
         }
     }
 
-    private static List<String> addMissingKeys(File file, InputStream defaults, Logger logger, String fileLabel,
+    private static List<String> addMissingKeys(@Nullable File file, @Nullable InputStream defaults, @Nullable Logger logger, String fileLabel,
             Collection<String> openSections, boolean skipUnencodable) {
         if (file == null || !file.isFile() || defaults == null) {
             return List.of();
@@ -109,6 +110,7 @@ public final class ConfigDefaultsInserter {
         List<Line> defaultLines = defaultsParsed.lines();
         Target target = new Target(text, YamlLines.parse(text, charset), defaultLines);
         Set<String> openDefaults = pathsInside(defaultsParsed, openSections);
+        @Nullable
         SeenDefaults seen = openDefaults.isEmpty() ? null : SeenDefaults.load(file, logger);
         List<String> added = new ArrayList<>();
         Blocked inline = new Blocked();
@@ -119,18 +121,19 @@ public final class ConfigDefaultsInserter {
         boolean replacedChars = false;
         for (int i = 0; i < defaultLines.size(); i++) {
             Line line = defaultLines.get(i);
+            @Nullable
             String path = line.path();
             if (line.kind() != Kind.KEY || path == null || current.contains(path) || target.has(path)
                     || insideAny(path, added)) {
                 continue;
             }
-            String parent = line.key().parent();
+            String parent = line.requireKey().requireParent();
             if (!parent.isEmpty() && !current.isConfigurationSection(parent) && !target.isEmptyKey(parent)) {
                 skipped.add(path); // under a plain value or a list
                 continue;
             }
             if (openDefaults.contains(path) && sectionExists(path, openSections, current)
-                    && seen.alreadyOffered(path)) {
+                    && seen != null && seen.alreadyOffered(path)) {
                 continue;
             }
             String section = target.unwritableSection(parent);
@@ -225,7 +228,7 @@ public final class ConfigDefaultsInserter {
             sections.add(section);
         }
 
-        void warn(Logger logger, String fileLabel, String problem) {
+        void warn(@Nullable Logger logger, String fileLabel, String problem) {
             if (keys.isEmpty()) {
                 return;
             }
@@ -254,8 +257,9 @@ public final class ConfigDefaultsInserter {
             this.lineEnding = YamlLines.lineEndingOf(text);
             List<Line> lines = parsed.lines();
             for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).path() != null) {
-                    index.putIfAbsent(lines.get(i).path(), i);
+                String path = lines.get(i).path();
+                if (path != null) {
+                    index.putIfAbsent(path, i);
                 }
             }
             // Per default key, the nearest sibling before and after it that the file has.
@@ -270,12 +274,13 @@ public final class ConfigDefaultsInserter {
             for (int i = from; i != to; i += step) {
                 Line line = defaults.get(i);
                 result[i] = -1;
-                if (line.kind() != Kind.KEY || line.path() == null) {
+                String path = line.path();
+                if (line.kind() != Kind.KEY || path == null) {
                     continue;
                 }
-                String parent = line.key().parent();
+                String parent = line.requireKey().requireParent();
                 result[i] = lastPresent.getOrDefault(parent, -1);
-                Integer present = index.get(line.path());
+                Integer present = index.get(path);
                 if (present != null) {
                     lastPresent.put(parent, present);
                 }
@@ -305,7 +310,9 @@ public final class ConfigDefaultsInserter {
 
         // Nearest enclosing section, from the key's parent up, that the file doesn't
         // write one key per line (inline, or an alias), or null.
+        @Nullable
         String unwritableSection(String parent) {
+            @Nullable
             String hidden = null;
             for (String section = parent; !section.isEmpty(); section = YamlLines.parentOf(section)) {
                 if (has(section)) {
@@ -325,7 +332,7 @@ public final class ConfigDefaultsInserter {
             if (sibling >= 0) {
                 return parsed.lines().get(sibling).indent();
             }
-            String parent = defaults.get(keyIndex).key().parent();
+            String parent = defaults.get(keyIndex).requireKey().requireParent();
             return parent.isEmpty() ? 0 : line(parent).indent() + Math.max(1, indentStep(defaultsParsed));
         }
 
@@ -344,7 +351,7 @@ public final class ConfigDefaultsInserter {
                 offset = lines.get(YamlLines.commentsStart(lines, nextPresent[keyIndex])).start();
                 insertion = block + blank;
             } else {
-                String parent = defaults.get(keyIndex).key().parent();
+                String parent = defaults.get(keyIndex).requireKey().requireParent();
                 offset = parent.isEmpty() ? text.length() : line(parent).end();
                 insertion = blank + block;
             }
@@ -374,14 +381,15 @@ public final class ConfigDefaultsInserter {
     private static Set<String> pathsInside(Parsed defaults, Collection<String> openSections) {
         Set<String> paths = new LinkedHashSet<>();
         for (Line line : defaults.lines()) {
-            if (line.kind() == Kind.KEY && line.path() != null && openSectionOf(line.path(), openSections) != null) {
-                paths.add(line.path());
+            String path = line.path();
+            if (line.kind() == Kind.KEY && path != null && openSectionOf(path, openSections) != null) {
+                paths.add(path);
             }
         }
         return paths;
     }
 
-    private static String openSectionOf(String path, Collection<String> openSections) {
+    private static @Nullable String openSectionOf(String path, Collection<String> openSections) {
         for (String section : openSections) {
             if (path.startsWith(section + ".")) {
                 return section;
@@ -395,7 +403,7 @@ public final class ConfigDefaultsInserter {
         return current.isConfigurationSection(openSectionOf(path, openSections));
     }
 
-    private static void markSeen(SeenDefaults seen, Set<String> openDefaults, Logger logger) {
+    private static void markSeen(@Nullable SeenDefaults seen, Set<String> openDefaults, @Nullable Logger logger) {
         if (seen != null) {
             seen.markAll(openDefaults, logger);
         }
@@ -421,7 +429,7 @@ public final class ConfigDefaultsInserter {
             this.offered = new LinkedHashSet<>(state.getStringList(fileName));
         }
 
-        static SeenDefaults load(File file, Logger logger) {
+        static SeenDefaults load(File file, @Nullable Logger logger) {
             File stateFile = new File(file.getAbsoluteFile().getParentFile(), SEEN_FILE);
             return new SeenDefaults(stateFile, file.getName(), loadState(stateFile, logger));
         }
@@ -430,7 +438,7 @@ public final class ConfigDefaultsInserter {
             return !known || offered.contains(path);
         }
 
-        void markAll(Set<String> paths, Logger logger) {
+        void markAll(Set<String> paths, @Nullable Logger logger) {
             if (known && offered.containsAll(paths)) {
                 return;
             }
@@ -442,7 +450,7 @@ public final class ConfigDefaultsInserter {
 
     // The folder's state file (.seen-defaults.yml); a NUL path separator keeps
     // names like "config.yml" one top-level key.
-    static YamlConfiguration loadState(File stateFile, Logger logger) {
+    static YamlConfiguration loadState(File stateFile, @Nullable Logger logger) {
         YamlConfiguration state = new YamlConfiguration();
         state.options().pathSeparator('\0');
         if (stateFile.isFile()) {
@@ -455,7 +463,7 @@ public final class ConfigDefaultsInserter {
         return state;
     }
 
-    static void saveState(File stateFile, YamlConfiguration state, Logger logger) {
+    static void saveState(File stateFile, YamlConfiguration state, @Nullable Logger logger) {
         state.options().setHeader(List.of("Written by TurtleLib: per file, default entries already offered and old",
                 "duplicate keys already reported. Entries listed here aren't added or reported again."));
         try {
@@ -509,11 +517,12 @@ public final class ConfigDefaultsInserter {
 
     // A text value whose lines the encoding can't store becomes one double-quoted
     // YAML line with escape sequences, built from the parsed value; else null.
-    private static String escapedValueLine(List<Line> lines, int index, YamlConfiguration defaults, Charset charset) {
+    private static @Nullable String escapedValueLine(List<Line> lines, int index, YamlConfiguration defaults, Charset charset) {
         Line line = lines.get(index);
         String content = line.content();
         int colon = YamlLines.afterColon(content);
-        if (line.kind() != Kind.KEY || line.path() == null || colon < 0 || !defaults.isString(line.path())
+        String path = line.path();
+        if (line.kind() != Kind.KEY || path == null || colon < 0 || !defaults.isString(path)
                 || !charset.newEncoder().canEncode(content.substring(0, colon))) {
             return null;
         }
@@ -523,7 +532,7 @@ public final class ConfigDefaultsInserter {
         }
         CharsetEncoder encoder = charset.newEncoder();
         StringBuilder quoted = new StringBuilder(content.substring(0, colon)).append(" \"");
-        defaults.getString(line.path()).codePoints().forEach(codePoint -> {
+        defaults.getString(path).codePoints().forEach(codePoint -> {
             String character = Character.toString(codePoint);
             if (codePoint == '"' || codePoint == '\\') {
                 quoted.append('\\').append(character);
@@ -564,7 +573,7 @@ public final class ConfigDefaultsInserter {
         }
     }
 
-    private static void warn(Logger logger, String message) {
+    private static void warn(@Nullable Logger logger, String message) {
         if (logger != null) {
             logger.warning(message);
         }

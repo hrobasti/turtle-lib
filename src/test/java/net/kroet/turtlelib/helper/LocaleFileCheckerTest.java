@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class LocaleFileCheckerTest {
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path dir;
 

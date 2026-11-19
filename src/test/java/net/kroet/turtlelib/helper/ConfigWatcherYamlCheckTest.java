@@ -13,6 +13,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ConfigWatcherYamlCheckTest {
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path tempDir;
 

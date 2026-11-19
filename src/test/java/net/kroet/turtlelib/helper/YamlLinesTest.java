@@ -220,10 +220,10 @@ class YamlLinesTest {
                 "  - max-blocks: 2",
                 ""));
 
-        assertEquals("max-blocks", lines.get(1).key().name());
-        assertEquals(4, lines.get(1).key().column());
-        assertEquals(lines.get(1).key().owner(), lines.get(2).key().owner());
-        assertNotEquals(lines.get(1).key().owner(), lines.get(3).key().owner());
+        assertEquals("max-blocks", lines.get(1).requireKey().name());
+        assertEquals(4, lines.get(1).requireKey().column());
+        assertEquals(lines.get(1).requireKey().owner(), lines.get(2).requireKey().owner());
+        assertNotEquals(lines.get(1).requireKey().owner(), lines.get(3).requireKey().owner());
         assertNull(lines.get(1).path());
         assertEquals(Kind.LIST_ITEM, lines.get(1).kind());
     }

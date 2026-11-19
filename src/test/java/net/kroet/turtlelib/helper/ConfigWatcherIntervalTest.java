@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
  */
 class ConfigWatcherIntervalTest {
 
+    // Test-only: the watcher runs without a plugin here.
+    @SuppressWarnings("null")
     private final ConfigWatcher watcher = new ConfigWatcher(null, () -> null, () -> {
     }, null, true, 100L);
 

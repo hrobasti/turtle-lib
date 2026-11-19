@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import net.kroet.turtlelib.helper.LegacyDataUpgrade.CarriedValue;
 import net.kroet.turtlelib.helper.LegacyDataUpgrade.DroppedValue;
@@ -26,6 +27,7 @@ import net.kroet.turtlelib.helper.LegacyDataUpgrade.RemovedEntry;
 import net.kroet.turtlelib.helper.LegacyDataUpgrade.Report;
 import net.kroet.turtlelib.helper.LegacyDataUpgrade.SkipReason;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -85,6 +87,8 @@ class LegacyDataUpgradeTest {
             "update-check.interval-hours", "update_check.interval_hours",
             "species-limits.oak.max-horizontal-radius", "species_limits.oak.max_horizontal_radius");
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path dataDir;
 
@@ -540,7 +544,7 @@ class LegacyDataUpgradeTest {
                 .carryOverValues("config.yml", MIGRATIONS, "soils");
     }
 
-    private InputStream resource(String path) {
+    private @Nullable InputStream resource(String path) {
         return jar.containsKey(path) ? new ByteArrayInputStream(jar.get(path).getBytes(StandardCharsets.UTF_8)) : null;
     }
 
@@ -555,6 +559,6 @@ class LegacyDataUpgradeTest {
     }
 
     private YamlConfiguration yaml(String path) throws IOException {
-        return YamlLines.parseYaml(read(path));
+        return Objects.requireNonNull(YamlLines.parseYaml(read(path)), path);
     }
 }

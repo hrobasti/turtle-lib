@@ -29,14 +29,20 @@ class ConfigWatcherPollTest {
 
     private static final String SETTINGS = "enable_timber: false\nmax_blocks: 300\n";
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path tempDir;
 
     private final List<LogRecord> records = new ArrayList<>();
     private final Logger logger = capturingLogger(records);
     private final List<SkipReason> skipped = new ArrayList<>();
+    // Test-only: the watcher runs without a plugin here.
+    @SuppressWarnings("null")
     private final ConfigWatcher watcher = new ConfigWatcher(null, () -> null, () -> {
     }, skipped::add, true, 100L);
+    // Set in startWithSettings before each test.
+    @SuppressWarnings("null")
     private File file;
     private long mtime = 1_700_000_000_000L;
 
@@ -185,6 +191,7 @@ class ConfigWatcherPollTest {
 
     @Test
     void withoutHookAnEnglishWarningIsLogged() {
+        @SuppressWarnings("null") // test-only: no plugin
         ConfigWatcher plain = new ConfigWatcher(null, () -> null, () -> {
         }, null, true, 100L);
 
@@ -207,6 +214,8 @@ class ConfigWatcherPollTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord logRecord) {
                 records.add(logRecord);

@@ -3,6 +3,7 @@ package net.kroet.turtlelib.helper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -197,6 +198,7 @@ class UpdateCheckerTest {
 
     @Test
     void plainHttpEndpointIsRefusedBeforeAnyRequest() {
+        @SuppressWarnings("null") // the HTTPS check comes before any use of the client
         CompletableFuture<JsonElement> response = new UpdateChecker(false, false, null)
                 .fetchJsonAsync("http://127.0.0.1:9/versions", null);
 
@@ -219,6 +221,8 @@ class UpdateCheckerTest {
         var releasesOnly = new UpdateChecker(false, false, null).selectModrinthVersion(versions);
         var withPrereleases = new UpdateChecker(true, false, null).selectModrinthVersion(versions);
 
+        assertNotNull(releasesOnly);
+        assertNotNull(withPrereleases);
         assertEquals("2.7.0", releasesOnly.json().get("version_number").getAsString());
         assertEquals("3.0.0", withPrereleases.json().get("version_number").getAsString());
     }
@@ -229,6 +233,7 @@ class UpdateCheckerTest {
 
         var selected = new UpdateChecker(false, false, null).selectModrinthVersion(versions);
 
+        assertNotNull(selected);
         assertEquals("1.5.0", selected.json().get("version_number").getAsString());
     }
 
@@ -236,6 +241,8 @@ class UpdateCheckerTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord logRecord) {
                 records.add(logRecord);
@@ -264,6 +271,8 @@ class UpdateCheckerTest {
         assertEquals(List.of(Provider.HANGAR), UpdateChecker.providersToCheck(2, "slug", null));
     }
 
+    // The mode check comes before any use of the plugin.
+    @SuppressWarnings("null")
     @Test
     void providerModeOutsideZeroToTwoIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> new UpdateChecker(null, 3, false, "slug", "User/Project"));

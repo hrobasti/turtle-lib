@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.logging.Logger;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Replaces a file's content in one step, so a crash while writing can't leave
@@ -27,7 +28,7 @@ final class AtomicFiles {
 
     // Writes a hidden temp file next to the target (not *.yml, so no helper reads
     // it as a config or lang file), flushes it to disk and moves it into place.
-    static void write(Path target, byte[] bytes, Logger logger) throws IOException {
+    static void write(Path target, byte[] bytes, @Nullable Logger logger) throws IOException {
         Path temp = tempFileFor(target);
         try {
             writeDurably(temp, bytes);

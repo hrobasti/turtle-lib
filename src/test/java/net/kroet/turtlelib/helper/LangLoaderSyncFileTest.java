@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -42,6 +43,8 @@ class LangLoaderSyncFileTest {
             "  prefix: '<gray>[Bäume]</gray>'",
             "");
 
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path tempDir;
 
@@ -140,8 +143,8 @@ class LangLoaderSyncFileTest {
 
         assertFalse(result.unreadable());
         assertEquals(List.of("ui.prefix"), result.added());
-        assertEquals("<red>Neu geladen</red>", result.target().getString("command.reload"));
-        assertEquals("Hilfe", result.target().getString("command.help"));
+        assertEquals("<red>Neu geladen</red>", target(result).getString("command.reload"));
+        assertEquals("Hilfe", target(result).getString("command.help"));
     }
 
     @Test
@@ -228,7 +231,7 @@ class LangLoaderSyncFileTest {
         assertFalse(result.unreadable());
         assertTrue(result.added().isEmpty());
         assertArrayEquals(original, Files.readAllBytes(file));
-        assertEquals("Bäume neu geladen", result.target().getString("command.reload"));
+        assertEquals("Bäume neu geladen", target(result).getString("command.reload"));
         assertTrue(records.isEmpty(), () -> records.get(0).getMessage());
     }
 
@@ -250,8 +253,8 @@ class LangLoaderSyncFileTest {
         byte[] bytes = Files.readAllBytes(file);
         assertArrayEquals(expected, bytes);
         assertFalse(YamlLines.isValidUtf8(bytes));
-        assertEquals("Grüße aus Köln", result.target().getString("command.reload"));
-        assertEquals("Hilfe für Bäume", result.target().getString("command.help"));
+        assertEquals("Grüße aus Köln", target(result).getString("command.reload"));
+        assertEquals("Hilfe für Bäume", target(result).getString("command.help"));
         assertTrue(records.isEmpty(), () -> records.get(0).getMessage());
     }
 
@@ -264,7 +267,7 @@ class LangLoaderSyncFileTest {
         LangLoader.SyncResult result = sync(file, GERMAN_DEFAULTS, Map.of());
 
         assertArrayEquals(text.replace("light_red", "red").getBytes(ANSI), Files.readAllBytes(file));
-        assertEquals("<red>Grüße</red>", result.target().getString("command.reload"));
+        assertEquals("<red>Grüße</red>", target(result).getString("command.reload"));
         assertEquals(1, records.size());
         assertEquals(Level.INFO, records.get(0).getLevel());
         assertEquals("Replaced invalid <light_red> color tags with <red> in lang/de_DE.yml", records.get(0).getMessage());
@@ -281,7 +284,7 @@ class LangLoaderSyncFileTest {
         assertEquals(List.of("command.help"), result.added());
         String written = new String(Files.readAllBytes(file), ANSI);
         assertEquals("command:\n  reload: Köln\n  help: \"Pomoc \\\"\\u0142ód\\u017A\\\" \\\\ \\U0001F332\"\n", written);
-        assertEquals("Pomoc \"łódź\" \\ 🌲", result.target().getString("command.help"));
+        assertEquals("Pomoc \"łódź\" \\ 🌲", target(result).getString("command.help"));
         assertTrue(records.isEmpty(), () -> records.get(0).getMessage());
     }
 
@@ -307,7 +310,7 @@ class LangLoaderSyncFileTest {
         assertEquals("command:\n  reload: Köln\nwarn:\n  unsupported_server_version: \"<yellow>Ostrze\\u017Cenie:"
                 + " wymagany <gold><required_server></gold> lub nowszy, masz <gold><mc_version></gold>.\"\n",
                 new String(Files.readAllBytes(file), ANSI));
-        assertEquals(folded, result.target().getString("warn.unsupported_server_version"));
+        assertEquals(folded, target(result).getString("warn.unsupported_server_version"));
         assertTrue(records.isEmpty(), () -> records.get(0).getMessage());
 
         assertTrue(sync(file, polish, Map.of()).added().isEmpty());
@@ -335,6 +338,8 @@ class LangLoaderSyncFileTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord logRecord) {
                 records.add(logRecord);
@@ -349,5 +354,10 @@ class LangLoaderSyncFileTest {
             }
         });
         return logger;
+    }
+
+    // The re-read file of a sync that could read it.
+    private static YamlConfiguration target(LangLoader.SyncResult result) {
+        return Objects.requireNonNull(result.target(), "target");
     }
 }

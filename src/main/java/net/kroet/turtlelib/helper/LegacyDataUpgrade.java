@@ -33,6 +33,7 @@ import net.kroet.turtlelib.helper.YamlLines.Parsed;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One-time clean upgrade of a plugin data folder from an older major version:
@@ -93,7 +94,7 @@ public final class LegacyDataUpgrade {
      * legacy data was found, or when a problem stopped the upgrade before any file
      * was moved ({@code errors} then says why). Paths use {@code /} separators.
      */
-    public record Report(boolean performed, Path backupDir, List<CarriedValue> carried, List<DroppedValue> dropped,
+    public record Report(boolean performed, @Nullable Path backupDir, List<CarriedValue> carried, List<DroppedValue> dropped,
             List<RemovedEntry> removed, List<MissingListEntries> missingListEntries, List<String> customizedFiles,
             List<String> filesWithoutBaseline, List<String> errors) {
 
@@ -115,26 +116,28 @@ public final class LegacyDataUpgrade {
      * @param resources
      *            opens a bundled resource by its jar path, {@code null} if missing
      */
-    public static Builder builder(File dataFolder, Function<String, InputStream> resources, Logger logger) {
+    public static Builder builder(File dataFolder, Function<String, ? extends @Nullable InputStream> resources,
+            @Nullable Logger logger) {
         return new Builder(Objects.requireNonNull(dataFolder, "dataFolder"),
                 Objects.requireNonNull(resources, "resources"), logger);
     }
 
     public static final class Builder {
         private final File dataFolder;
-        private final Function<String, InputStream> resources;
-        private final Logger logger;
+        private final Function<String, ? extends @Nullable InputStream> resources;
+        private final @Nullable Logger logger;
         private String markerFile = "config.yml";
         private final List<String> markerKeys = new ArrayList<>();
-        private String backupDirName;
-        private String legacyDefaultsRoot;
+        private @Nullable String backupDirName;
+        private @Nullable String legacyDefaultsRoot;
         private final List<String> olderDefaultsRoots = new ArrayList<>();
         private final Set<String> freshResources = new LinkedHashSet<>();
         private final Set<String> keepFiles = new LinkedHashSet<>();
         private final Map<String, CarryOver> carryOvers = new LinkedHashMap<>();
         private final Map<String, Set<String>> ignoredOldKeys = new LinkedHashMap<>();
 
-        private Builder(File dataFolder, Function<String, InputStream> resources, Logger logger) {
+        private Builder(File dataFolder, Function<String, ? extends @Nullable InputStream> resources,
+                @Nullable Logger logger) {
             this.dataFolder = dataFolder;
             this.resources = resources;
             this.logger = logger;
@@ -242,6 +245,7 @@ public final class LegacyDataUpgrade {
          * any config.
          */
         public Report run() {
+            String backupDirName = this.backupDirName;
             if (backupDirName == null || !BACKUP_NAME.matcher(backupDirName).matches() || backupDirName.contains("..")) {
                 throw new IllegalStateException("backupDirName must be a plain folder name");
             }
@@ -334,8 +338,9 @@ public final class LegacyDataUpgrade {
                 }
                 fresh.put(path, bytes);
             }
+            String legacyRoot = spec.legacyDefaultsRoot;
             for (String path : spec.carryOvers.keySet()) {
-                byte[] bytes = spec.legacyDefaultsRoot == null ? null : readResource(spec.legacyDefaultsRoot + path);
+                byte[] bytes = legacyRoot == null ? null : readResource(legacyRoot + path);
                 if (bytes == null) {
                     return abort("Old default file for " + path + " is missing from the jar");
                 }
@@ -394,10 +399,11 @@ public final class LegacyDataUpgrade {
 
         // Moves every entry except earlier backups; on failure the moved ones go back.
         private Path moveToBackup() throws IOException {
-            Pattern earlierBackup = Pattern.compile(Pattern.quote(spec.backupDirName) + "(-\\d+)?");
-            Path backup = dataDir.resolve(spec.backupDirName);
+            String backupDirName = Objects.requireNonNull(spec.backupDirName, "backupDirName");
+            Pattern earlierBackup = Pattern.compile(Pattern.quote(backupDirName) + "(-\\d+)?");
+            Path backup = dataDir.resolve(backupDirName);
             for (int suffix = 2; Files.exists(backup); suffix++) {
-                backup = dataDir.resolve(spec.backupDirName + "-" + suffix);
+                backup = dataDir.resolve(backupDirName + "-" + suffix);
             }
             List<Path> entries;
             try (Stream<Path> list = Files.list(dataDir)) {
@@ -490,13 +496,13 @@ public final class LegacyDataUpgrade {
         }
 
         private String carryValue(String file, CarryOver rules, String text, String oldPath, String newPath,
-                Object value, Object oldDefault) {
-            YamlConfiguration current = YamlLines.parseYaml(text);
+                Object value, @Nullable Object oldDefault) {
             String shown = display(value);
             if (!isWritable(value)) {
                 dropped.add(new DroppedValue(file, oldPath, shown, SkipReason.UNSUPPORTED_VALUE));
                 return text;
             }
+            YamlConfiguration current = Objects.requireNonNull(YamlLines.parseYaml(text), "fresh file isn't valid YAML");
             if (!current.isSet(newPath)) {
                 String parent = YamlLines.parentOf(newPath);
                 if (rules.openSections().contains(parent) && current.isConfigurationSection(parent)) {
@@ -530,9 +536,9 @@ public final class LegacyDataUpgrade {
 
         // Keeps an edit only if the result is valid YAML holding the admin's value.
         private String apply(String file, String before, String oldPath, String newPath, Object value,
-                String after) {
+                @Nullable String after) {
             YamlConfiguration check = after == null ? null : YamlLines.parseYaml(after);
-            if (check == null || !check.isSet(newPath) || !sameValue(value, check.get(newPath))) {
+            if (after == null || check == null || !check.isSet(newPath) || !sameValue(value, check.get(newPath))) {
                 dropped.add(new DroppedValue(file, oldPath, display(value), SkipReason.WRITE_FAILED));
                 return before;
             }
@@ -543,7 +549,7 @@ public final class LegacyDataUpgrade {
         private String removeEntry(String file, String text, String oldPath, String newPath) {
             Parsed parsed = YamlLines.parse(text);
             int index = YamlLines.indexOfPath(parsed.lines(), newPath);
-            if (index < 0 && YamlLines.parseYaml(text).isSet(newPath)) {
+            if (index < 0 && Objects.requireNonNull(YamlLines.parseYaml(text), "fresh file isn't valid YAML").isSet(newPath)) {
                 // An entry of a section the fresh file writes inline.
                 String blockStyle = blockForm(text, YamlLines.parentOf(newPath));
                 if (blockStyle == null) {
@@ -603,8 +609,9 @@ public final class LegacyDataUpgrade {
         // Default texts of the file from the legacy root and each older root.
         private List<String> knownDefaults(String relative) {
             List<String> roots = new ArrayList<>();
-            if (spec.legacyDefaultsRoot != null) {
-                roots.add(spec.legacyDefaultsRoot);
+            String legacyRoot = spec.legacyDefaultsRoot;
+            if (legacyRoot != null) {
+                roots.add(legacyRoot);
             }
             roots.addAll(spec.olderDefaultsRoots);
             List<String> texts = new ArrayList<>();
@@ -633,7 +640,7 @@ public final class LegacyDataUpgrade {
             return spec.keepFiles.stream().anyMatch(kept -> relative.equals(kept) || relative.startsWith(kept + "/"));
         }
 
-        private byte[] readResource(String path) {
+        private byte @Nullable [] readResource(String path) {
             try (InputStream in = spec.resources.apply(path)) {
                 return in == null ? null : in.readAllBytes();
             } catch (IOException e) {
@@ -649,12 +656,13 @@ public final class LegacyDataUpgrade {
 
         private void error(String message) {
             errors.add(message);
-            if (spec.logger != null) {
-                spec.logger.warning(message);
+            Logger logger = spec.logger;
+            if (logger != null) {
+                logger.warning(message);
             }
         }
 
-        private Report report(boolean performed, Path backup) {
+        private Report report(boolean performed, @Nullable Path backup) {
             return new Report(performed, backup, List.copyOf(carried), List.copyOf(dropped), List.copyOf(removed),
                     List.copyOf(missing), List.copyOf(customized), List.copyOf(withoutBaseline), List.copyOf(errors));
         }
@@ -664,7 +672,7 @@ public final class LegacyDataUpgrade {
      * {@code true} if the file has one of the dotted key paths, found on its key
      * lines like the marker keys; {@code false} for a missing or unreadable file.
      */
-    public static boolean hasAnyKey(File yamlFile, Collection<String> paths) {
+    public static boolean hasAnyKey(@Nullable File yamlFile, @Nullable Collection<String> paths) {
         if (yamlFile == null || !yamlFile.isFile() || paths == null || paths.isEmpty()) {
             return false;
         }
@@ -676,7 +684,7 @@ public final class LegacyDataUpgrade {
         }
     }
 
-    public static boolean hasAnyKey(File yamlFile, String... paths) {
+    public static boolean hasAnyKey(@Nullable File yamlFile, String @Nullable... paths) {
         return hasAnyKey(yamlFile, paths == null ? List.of() : Arrays.asList(paths));
     }
 
@@ -685,8 +693,9 @@ public final class LegacyDataUpgrade {
     private static Set<String> keyPaths(byte[] bytes) {
         Set<String> paths = new HashSet<>();
         for (Line line : YamlLines.parse(decode(bytes)).lines()) {
-            if (line.path() != null) {
-                paths.add(line.path());
+            String path = line.path();
+            if (path != null) {
+                paths.add(path);
             }
         }
         return paths;
@@ -694,7 +703,7 @@ public final class LegacyDataUpgrade {
 
     // --- text edits on the fresh file ---
 
-    private static String replaceScalar(String text, String path, Object value) {
+    private static @Nullable String replaceScalar(String text, String path, Object value) {
         Parsed parsed = YamlLines.parse(text);
         int index = YamlLines.indexOfPath(parsed.lines(), path);
         if (index < 0) {
@@ -716,7 +725,7 @@ public final class LegacyDataUpgrade {
 
     // Swaps the list items; comments inside the old block stay around the new
     // items.
-    private static String replaceList(String text, String path, List<?> items) {
+    private static @Nullable String replaceList(String text, String path, List<?> items) {
         Parsed parsed = YamlLines.parse(text);
         int index = YamlLines.indexOfPath(parsed.lines(), path);
         if (index < 0) {
@@ -761,7 +770,7 @@ public final class LegacyDataUpgrade {
         return text.substring(0, key.start()) + block + text.substring(lines.get(blockEnd).end());
     }
 
-    private static String insertChild(String text, String section, String path, Object value) {
+    private static @Nullable String insertChild(String text, String section, String path, Object value) {
         Parsed parsed = YamlLines.parse(text);
         List<Line> lines = parsed.lines();
         int index = YamlLines.indexOfPath(lines, section);
@@ -817,7 +826,7 @@ public final class LegacyDataUpgrade {
 
     // The section rewritten from one inline line like "soils: {DIRT: true}" to one
     // key per line; null if it spans lines or holds values that can't be written.
-    private static String blockForm(String text, String section) {
+    private static @Nullable String blockForm(String text, String section) {
         Parsed parsed = YamlLines.parse(text);
         List<Line> lines = parsed.lines();
         int index = YamlLines.indexOfPath(lines, section);
@@ -934,7 +943,7 @@ public final class LegacyDataUpgrade {
         }
     }
 
-    private static String formatScalar(Object value, Style style) {
+    private static String formatScalar(@Nullable Object value, Style style) {
         if (value instanceof Boolean || value instanceof Number) {
             return String.valueOf(value);
         }
@@ -981,19 +990,19 @@ public final class LegacyDataUpgrade {
         return false;
     }
 
-    private static Object leafOrNull(YamlConfiguration yaml, String path) {
+    private static @Nullable Object leafOrNull(YamlConfiguration yaml, String path) {
         Object value = yaml.isSet(path) ? yaml.get(path) : null;
         return value instanceof ConfigurationSection ? null : value;
     }
 
-    private static boolean isWritable(Object value) {
+    private static boolean isWritable(@Nullable Object value) {
         if (value instanceof List<?> list) {
             return list.stream().allMatch(LegacyDataUpgrade::isScalar);
         }
         return isScalar(value);
     }
 
-    private static boolean isScalar(Object value) {
+    private static boolean isScalar(@Nullable Object value) {
         return value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Date;
     }
 
@@ -1005,7 +1014,7 @@ public final class LegacyDataUpgrade {
                 : instant.toString();
     }
 
-    static boolean sameValue(Object a, Object b) {
+    static boolean sameValue(@Nullable Object a, @Nullable Object b) {
         if (a instanceof Date date) {
             a = dateText(date);
         }
@@ -1099,7 +1108,7 @@ public final class LegacyDataUpgrade {
         return result;
     }
 
-    private static String display(Object value) {
+    private static String display(@Nullable Object value) {
         if (value instanceof List<?> list) {
             return "[" + String.join(", ", list.stream().map(LegacyDataUpgrade::display).toList()) + "]";
         }

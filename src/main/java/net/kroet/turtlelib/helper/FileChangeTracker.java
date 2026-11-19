@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 import java.util.zip.CRC32;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Remembers the state of a plugin's data files and reports what changed since
@@ -23,14 +24,14 @@ import org.bukkit.configuration.file.YamlConfiguration;
  */
 public final class FileChangeTracker {
     private final File dataFolder;
-    private final Logger logger;
+    private final @Nullable Logger logger;
     private final List<String> yamlFiles;
     private final List<Folder> folders;
-    private Map<String, Map<String, String>> yamlSnapshot;
-    private Map<String, Long> folderSnapshot;
+    private @Nullable Map<String, Map<String, String>> yamlSnapshot;
+    private @Nullable Map<String, Long> folderSnapshot;
 
     /** One changed setting; {@code newValue} is {@code null} if it was removed. */
-    public record KeyChange(String key, String newValue) {
+    public record KeyChange(String key, @Nullable String newValue) {
         /** {@code key=value}, or {@code key=<removed>}. */
         public String describe() {
             return key + "=" + (newValue == null ? "<removed>" : newValue);
@@ -87,17 +88,17 @@ public final class FileChangeTracker {
         this.folders = List.copyOf(builder.folders);
     }
 
-    public static Builder builder(File dataFolder, Logger logger) {
+    public static Builder builder(File dataFolder, @Nullable Logger logger) {
         return new Builder(Objects.requireNonNull(dataFolder, "dataFolder"), logger);
     }
 
     public static final class Builder {
         private final File dataFolder;
-        private final Logger logger;
+        private final @Nullable Logger logger;
         private final List<String> yamlFiles = new ArrayList<>();
         private final List<Folder> folders = new ArrayList<>();
 
-        private Builder(File dataFolder, Logger logger) {
+        private Builder(File dataFolder, @Nullable Logger logger) {
             this.dataFolder = dataFolder;
             this.logger = logger;
         }
@@ -132,12 +133,13 @@ public final class FileChangeTracker {
     public Changes compareAndUpdate() {
         List<String> unreadable = new ArrayList<>();
         Map<String, Map<String, String>> yaml = new LinkedHashMap<>();
+        Map<String, Map<String, String>> previousYaml = yamlSnapshot;
         for (String file : yamlFiles) {
             Map<String, String> values = readYaml(file, unreadable);
             if (values != null) {
                 yaml.put(file, values);
-            } else if (yamlSnapshot != null && yamlSnapshot.containsKey(file)) {
-                yaml.put(file, yamlSnapshot.get(file));
+            } else if (previousYaml != null && previousYaml.containsKey(file)) {
+                yaml.put(file, previousYaml.get(file));
             }
         }
         Map<String, Long> hashes = new LinkedHashMap<>();
@@ -145,23 +147,24 @@ public final class FileChangeTracker {
             readFolder(folder, hashes, unreadable);
         }
 
-        boolean first = yamlSnapshot == null;
+        boolean first = previousYaml == null;
         List<FileKeyChanges> keyChanges = new ArrayList<>();
         List<String> changed = new ArrayList<>();
         List<String> added = new ArrayList<>();
         List<String> removed = new ArrayList<>();
-        if (!first) {
+        if (previousYaml != null) {
             for (String file : yamlFiles) {
-                List<KeyChange> changes = diff(yamlSnapshot.getOrDefault(file, Map.of()), yaml.getOrDefault(file,
+                List<KeyChange> changes = diff(previousYaml.getOrDefault(file, Map.of()), yaml.getOrDefault(file,
                         Map.of()));
                 if (!changes.isEmpty()) {
                     keyChanges.add(new FileKeyChanges(file, changes));
                 }
             }
-            TreeSet<String> names = new TreeSet<>(folderSnapshot.keySet());
+            Map<String, Long> previousFolders = Objects.requireNonNull(folderSnapshot, "folderSnapshot");
+            TreeSet<String> names = new TreeSet<>(previousFolders.keySet());
             names.addAll(hashes.keySet());
             for (String name : names) {
-                Long before = folderSnapshot.get(name);
+                Long before = previousFolders.get(name);
                 Long now = hashes.get(name);
                 if (before == null) {
                     added.add(name);
@@ -178,7 +181,7 @@ public final class FileChangeTracker {
                 List.copyOf(removed), List.copyOf(unreadable));
     }
 
-    private Map<String, String> readYaml(String relativePath, List<String> unreadable) {
+    private @Nullable Map<String, String> readYaml(String relativePath, List<String> unreadable) {
         File file = new File(dataFolder, relativePath);
         if (!file.isFile()) {
             return Map.of();
@@ -223,7 +226,8 @@ public final class FileChangeTracker {
             } catch (IOException e) {
                 warn("Could not read " + name + " to list its changes: " + e.getMessage());
                 unreadable.add(name);
-                Long previous = folderSnapshot == null ? null : folderSnapshot.get(name);
+                Map<String, Long> previousFolders = folderSnapshot;
+                Long previous = previousFolders == null ? null : previousFolders.get(name);
                 if (previous != null) {
                     hashes.put(name, previous);
                 }
@@ -257,6 +261,7 @@ public final class FileChangeTracker {
     }
 
     private void warn(String message) {
+        Logger logger = this.logger;
         if (logger != null) {
             logger.warning(message);
         }

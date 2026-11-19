@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class FileChangeTrackerTest {
+    // JUnit injects it before each test.
+    @SuppressWarnings("null")
     @TempDir
     Path dataDir;
 
@@ -28,6 +30,8 @@ class FileChangeTrackerTest {
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
+            // Handler has no null annotations; the logger never passes null.
+            @SuppressWarnings("null")
             @Override
             public void publish(LogRecord record) {
                 warnings.add(record.getMessage());

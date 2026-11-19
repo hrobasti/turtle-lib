@@ -15,6 +15,7 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Polls a target file on a fixed interval and triggers a callback on the main
@@ -23,17 +24,17 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public final class ConfigWatcher implements Runnable {
     private final JavaPlugin plugin;
-    private final Supplier<File> fileSupplier;
+    private final Supplier<? extends @Nullable File> fileSupplier;
     private final Runnable onChange;
-    private final Consumer<SkipReason> onSkipped;
+    private final @Nullable Consumer<SkipReason> onSkipped;
     private long intervalTicks;
     private volatile boolean enabled;
-    private BukkitTask task;
+    private @Nullable BukkitTask task;
     private final Object stateLock = new Object();
     // Content the plugin last loaded; observed only saves re-hashing each poll.
     private Fingerprint baseline = Fingerprint.missing();
     private Fingerprint observed = Fingerprint.missing();
-    private SkipReason reportedSkip;
+    private @Nullable SkipReason reportedSkip;
 
     /** Why a change of the watched file didn't trigger {@code onChange}. */
     public enum SkipReason {
@@ -48,9 +49,9 @@ public final class ConfigWatcher implements Runnable {
     }
 
     ConfigWatcher(JavaPlugin plugin,
-            Supplier<File> fileSupplier,
+            Supplier<? extends @Nullable File> fileSupplier,
             Runnable onChange,
-            Consumer<SkipReason> onSkipped,
+            @Nullable Consumer<SkipReason> onSkipped,
             boolean enabled,
             long intervalTicks) {
         this.plugin = plugin;
@@ -70,7 +71,7 @@ public final class ConfigWatcher implements Runnable {
      * reload can skip a broken file: {@code null} if it's valid or missing, else a
      * reason like "line 5, column 28: mapping values are not allowed here".
      */
-    public static String describeYamlError(File file) {
+    public static @Nullable String describeYamlError(@Nullable File file) {
         if (file == null || !file.isFile()) {
             return null;
         }
@@ -100,8 +101,9 @@ public final class ConfigWatcher implements Runnable {
             return false;
         }
         intervalTicks = ticks;
-        if (task != null) {
-            task.cancel();
+        BukkitTask current = task;
+        if (current != null) {
+            current.cancel();
             task = schedule();
         }
         return true;
@@ -120,8 +122,9 @@ public final class ConfigWatcher implements Runnable {
     }
 
     public synchronized void stop() {
-        if (task != null) {
-            task.cancel();
+        BukkitTask current = task;
+        if (current != null) {
+            current.cancel();
             task = null;
         }
     }
@@ -134,7 +137,7 @@ public final class ConfigWatcher implements Runnable {
         refreshBaseline(fileSupplier.get(), plugin.getLogger());
     }
 
-    void refreshBaseline(File file, Logger logger) {
+    void refreshBaseline(@Nullable File file, Logger logger) {
         synchronized (stateLock) {
             observed = fingerprint(file, observed, logger);
             baseline = observed;
@@ -150,7 +153,7 @@ public final class ConfigWatcher implements Runnable {
         setEnabled(enabled, this::refreshBaseline);
     }
 
-    void setEnabled(boolean enabled, File file, Logger logger) {
+    void setEnabled(boolean enabled, @Nullable File file, Logger logger) {
         setEnabled(enabled, () -> refreshBaseline(file, logger));
     }
 
@@ -187,7 +190,7 @@ public final class ConfigWatcher implements Runnable {
 
     // One poll: CHANGED once per new content, MISSING or EMPTY once per state;
     // the baseline stays at the last content with keys.
-    Outcome poll(File file, Logger logger) {
+    Outcome poll(@Nullable File file, Logger logger) {
         synchronized (stateLock) {
             observed = fingerprint(file, observed, logger);
             SkipReason skip = observed.skipReason();
@@ -207,7 +210,8 @@ public final class ConfigWatcher implements Runnable {
         }
     }
 
-    void reportSkipped(SkipReason reason, File file, Logger logger) {
+    void reportSkipped(SkipReason reason, @Nullable File file, Logger logger) {
+        Consumer<SkipReason> onSkipped = this.onSkipped;
         if (onSkipped != null) {
             onSkipped.accept(reason);
             return;
@@ -226,7 +230,7 @@ public final class ConfigWatcher implements Runnable {
         }
     }
 
-    static Fingerprint fingerprint(File file, Fingerprint previous, Logger logger) {
+    static Fingerprint fingerprint(@Nullable File file, @Nullable Fingerprint previous, Logger logger) {
         if (file == null || !file.exists()) {
             return Fingerprint.missing();
         }
@@ -262,9 +266,9 @@ public final class ConfigWatcher implements Runnable {
     public static final class Builder {
         private static final long DEFAULT_INTERVAL_TICKS = 100L;
         private final JavaPlugin plugin;
-        private Supplier<File> fileSupplier;
-        private Runnable onChange;
-        private Consumer<SkipReason> onSkipped;
+        private @Nullable Supplier<? extends @Nullable File> fileSupplier;
+        private @Nullable Runnable onChange;
+        private @Nullable Consumer<SkipReason> onSkipped;
         private boolean enabled = true;
         private long intervalTicks = DEFAULT_INTERVAL_TICKS;
 
@@ -272,7 +276,7 @@ public final class ConfigWatcher implements Runnable {
             this.plugin = Objects.requireNonNull(plugin, "plugin");
         }
 
-        public Builder file(File file) {
+        public Builder file(@Nullable File file) {
             this.fileSupplier = () -> file;
             return this;
         }
@@ -281,7 +285,7 @@ public final class ConfigWatcher implements Runnable {
          * Resolves the file on every poll, on the background thread, so it must not
          * read the plugin's {@code FileConfiguration}.
          */
-        public Builder fileSupplier(Supplier<File> supplier) {
+        public Builder fileSupplier(Supplier<? extends @Nullable File> supplier) {
             this.fileSupplier = supplier;
             return this;
         }
@@ -326,10 +330,10 @@ public final class ConfigWatcher implements Runnable {
         }
 
         public ConfigWatcher build() {
-            Objects.requireNonNull(fileSupplier, "fileSupplier");
-            Objects.requireNonNull(onChange, "onChange");
+            Supplier<? extends @Nullable File> supplier = Objects.requireNonNull(fileSupplier, "fileSupplier");
+            Runnable callback = Objects.requireNonNull(onChange, "onChange");
             long ticks = intervalTicks <= 0L ? DEFAULT_INTERVAL_TICKS : intervalTicks;
-            return new ConfigWatcher(plugin, fileSupplier, onChange, onSkipped, enabled, ticks);
+            return new ConfigWatcher(plugin, supplier, callback, onSkipped, enabled, ticks);
         }
     }
 
@@ -338,6 +342,7 @@ public final class ConfigWatcher implements Runnable {
             return new Fingerprint(0L, -1L, 0, false, false);
         }
 
+        @Nullable
         SkipReason skipReason() {
             if (!exists) {
                 return SkipReason.MISSING;

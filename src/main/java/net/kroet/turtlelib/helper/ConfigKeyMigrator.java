@@ -27,6 +27,7 @@ import net.kroet.turtlelib.helper.YamlLines.Line;
 import net.kroet.turtlelib.helper.YamlLines.Parsed;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Renames config/lang keys directly in the file's raw text, so quoting,
@@ -45,8 +46,8 @@ public final class ConfigKeyMigrator {
      * Style rename: each changed segment of the dotted paths is renamed as a key
      * name at any depth. Returns true if the file itself was rewritten.
      */
-    public static boolean rewriteLegacyKeysInFile(File file, Logger logger, String fileLabel,
-            Map<String, String> oldToNew) {
+    public static boolean rewriteLegacyKeysInFile(@Nullable File file, @Nullable Logger logger, String fileLabel,
+            @Nullable Map<String, String> oldToNew) {
         return rewriteLegacyKeysInFile(file, logger, fileLabel, oldToNew, null);
     }
 
@@ -55,8 +56,8 @@ public final class ConfigKeyMigrator {
      * whose new name exists too is also removed if its value is still the default
      * in {@code legacyDefaults}, the old version's file (UTF-8, may be null).
      */
-    public static boolean rewriteLegacyKeysInFile(File file, Logger logger, String fileLabel,
-            Map<String, String> oldToNew, InputStream legacyDefaults) {
+    public static boolean rewriteLegacyKeysInFile(@Nullable File file, @Nullable Logger logger, String fileLabel,
+            @Nullable Map<String, String> oldToNew, @Nullable InputStream legacyDefaults) {
         Map<String, String> leafRenames = deriveLeafRenames(oldToNew == null ? Map.of() : oldToNew);
         if (leafRenames.isEmpty()) {
             return false;
@@ -71,8 +72,8 @@ public final class ConfigKeyMigrator {
      * Renames exactly the given dotted paths; a new parent moves the key with its
      * block and comments. Returns true if the file itself was rewritten.
      */
-    public static boolean rewriteKeyPathsInFile(File file, Logger logger, String fileLabel,
-            Map<String, String> oldToNew) {
+    public static boolean rewriteKeyPathsInFile(@Nullable File file, @Nullable Logger logger, String fileLabel,
+            @Nullable Map<String, String> oldToNew) {
         return rewriteKeyPathsInFile(file, logger, fileLabel, oldToNew, null);
     }
 
@@ -81,8 +82,8 @@ public final class ConfigKeyMigrator {
      * version's defaults as in
      * {@link #rewriteLegacyKeysInFile(File, Logger, String, Map, InputStream)}.
      */
-    public static boolean rewriteKeyPathsInFile(File file, Logger logger, String fileLabel,
-            Map<String, String> oldToNew, InputStream legacyDefaults) {
+    public static boolean rewriteKeyPathsInFile(@Nullable File file, @Nullable Logger logger, String fileLabel,
+            @Nullable Map<String, String> oldToNew, @Nullable InputStream legacyDefaults) {
         Map<String, String> renames = checkPathRenames(oldToNew == null ? Map.of() : oldToNew);
         if (renames.isEmpty()) {
             return false;
@@ -94,7 +95,7 @@ public final class ConfigKeyMigrator {
     }
 
     // Any failure while renaming, even a stack overflow, leaves the file unchanged.
-    private static boolean guarded(Logger logger, String fileLabel, BooleanSupplier rename) {
+    private static boolean guarded(@Nullable Logger logger, String fileLabel, BooleanSupplier rename) {
         try {
             return rename.getAsBoolean();
         } catch (RuntimeException | StackOverflowError e) {
@@ -180,7 +181,7 @@ public final class ConfigKeyMigrator {
         return renames;
     }
 
-    private static String[] segments(String path) {
+    private static String[] segments(@Nullable String path) {
         if (path == null || path.isEmpty()) {
             throw new IllegalArgumentException("Empty key path in the renames");
         }
@@ -203,10 +204,10 @@ public final class ConfigKeyMigrator {
 
     // The file as ISO-8859-1 chars (every byte survives), its charset and parsed
     // values.
-    private record Source(File file, Logger logger, String label, String text, Charset charset,
+    private record Source(File file, @Nullable Logger logger, String label, String text, Charset charset,
             YamlConfiguration yaml) {
 
-        static Source read(File file, Logger logger, String label) {
+        static @Nullable Source read(@Nullable File file, @Nullable Logger logger, String label) {
             if (file == null || !file.isFile()) {
                 return null;
             }
@@ -232,6 +233,7 @@ public final class ConfigKeyMigrator {
             return YamlLines.parse(text, charset);
         }
 
+        @Nullable
         YamlConfiguration yamlOf(String text) {
             return YamlLines.parseYaml(new String(text.getBytes(StandardCharsets.ISO_8859_1), charset));
         }
@@ -257,18 +259,18 @@ public final class ConfigKeyMigrator {
 
     private abstract static class Rename {
         final Source source;
-        final YamlConfiguration legacy;
+        final @Nullable YamlConfiguration legacy;
         final List<String> renamed = new ArrayList<>();
         final List<String> removed = new ArrayList<>();
         final Set<String> removedPaths = new HashSet<>();
         private final Map<String, String> kept = new LinkedHashMap<>();
 
-        Rename(Source source, InputStream legacyDefaults) {
+        Rename(Source source, @Nullable InputStream legacyDefaults) {
             this.source = source;
             this.legacy = readLegacy(legacyDefaults);
         }
 
-        private static YamlConfiguration readLegacy(InputStream legacyDefaults) {
+        private static @Nullable YamlConfiguration readLegacy(@Nullable InputStream legacyDefaults) {
             if (legacyDefaults == null) {
                 return null;
             }
@@ -283,12 +285,13 @@ public final class ConfigKeyMigrator {
 
         // An old key next to its new name can go if its value equals the new key's
         // value or the old version's default.
-        boolean unchanged(String oldPath, String holderPath, String legacyPath) {
+        boolean unchanged(@Nullable String oldPath, @Nullable String holderPath, @Nullable String legacyPath) {
             YamlConfiguration yaml = source.yaml();
             if (oldPath == null || !yaml.isSet(oldPath)) {
                 return false;
             }
             Object value = yaml.get(oldPath);
+            YamlConfiguration legacy = this.legacy;
             return (holderPath != null && yaml.isSet(holderPath)
                     && LegacyDataUpgrade.sameValue(value, yaml.get(holderPath)))
                     || (legacy != null && legacyPath != null && legacy.isSet(legacyPath)
@@ -307,7 +310,7 @@ public final class ConfigKeyMigrator {
         }
 
         // Writes the result if Bukkit reads every value back where it belongs.
-        boolean finish(String result, Function<String, String> newPathOf, Map<String, String> listKeyRenames,
+        boolean finish(String result, Function<String, @Nullable String> newPathOf, Map<String, String> listKeyRenames,
                 String what) {
             reportKeptOnce();
             if (renamed.isEmpty() && removed.isEmpty()) {
@@ -368,7 +371,7 @@ public final class ConfigKeyMigrator {
         private final Map<String, String> newToOld = new HashMap<>();
         private final Set<String> keptPaths = new HashSet<>();
 
-        StyleRename(Source source, InputStream legacyDefaults, Map<String, String> leafRenames) {
+        StyleRename(Source source, @Nullable InputStream legacyDefaults, Map<String, String> leafRenames) {
             super(source, legacyDefaults);
             this.leafRenames = leafRenames;
             leafRenames.forEach((oldName, newName) -> newToOld.putIfAbsent(newName, oldName));
@@ -380,8 +383,9 @@ public final class ConfigKeyMigrator {
             List<Line> lines = source.parse(text).lines();
             Map<Integer, Set<String>> names = new HashMap<>();
             for (Line line : lines) {
-                if (line.key() != null) {
-                    names.computeIfAbsent(line.key().owner(), owner -> new HashSet<>()).add(line.key().name());
+                Key key = line.key();
+                if (key != null) {
+                    names.computeIfAbsent(key.owner(), owner -> new HashSet<>()).add(key.name());
                 }
             }
             Map<Integer, Map<String, String>> holders = new HashMap<>();
@@ -391,7 +395,11 @@ public final class ConfigKeyMigrator {
             for (int i = 0; i < lines.size(); i++) {
                 Line line = lines.get(i);
                 Key key = line.key();
-                String newName = key == null ? null : leafRenames.get(key.name());
+                if (key == null) {
+                    continue;
+                }
+                @Nullable
+                String newName = leafRenames.get(key.name());
                 if (newName == null || line.start() < skipUntil) {
                     continue;
                 }
@@ -403,24 +411,28 @@ public final class ConfigKeyMigrator {
                     renamed.add(key.name() + " -> " + newName);
                     continue;
                 }
-                String name = line.path() != null ? line.path() : key.name();
+                @Nullable
+                String path = line.path();
+                String name = path != null ? path : key.name();
+                @Nullable
                 String holder = holders.getOrDefault(key.owner(), Map.of()).get(newName);
-                if (holder == null && key.parent() != null) {
-                    holder = key.parent().isEmpty() ? newName : key.parent() + "." + newName;
+                String parent = key.parent();
+                if (holder == null && parent != null) {
+                    holder = parent.isEmpty() ? newName : parent + "." + newName;
                 }
                 skipUntil = lines.get(YamlLines.blockEnd(lines, i, key.column())).end();
-                if (line.kind() == Kind.KEY && unchanged(line.path(), holder, legacyPath(line.path()))) {
+                if (path != null && line.kind() == Kind.KEY && unchanged(path, holder, legacyPath(path))) {
                     int[] block = blockRange(text, lines, i);
                     result.append(text, copied, block[0]);
                     copied = block[1];
                     removed.add(name);
-                    removedPaths.add(line.path());
+                    removedPaths.add(path);
                 } else {
                     keep(name, "Not renaming '" + name + "' to '" + newName + "' in " + source.label() + ": '" + newName
                             + "' already exists in the same section and the old entry was changed; keep one of them"
                             + " and delete the other (reported once)");
-                    if (line.path() != null) {
-                        keptPaths.add(line.path());
+                    if (path != null) {
+                        keptPaths.add(path);
                     }
                 }
             }
@@ -429,7 +441,7 @@ public final class ConfigKeyMigrator {
         }
 
         // The path in the old version's defaults, which use the old names.
-        private String legacyPath(String path) {
+        private @Nullable String legacyPath(@Nullable String path) {
             if (path == null) {
                 return null;
             }
@@ -440,7 +452,7 @@ public final class ConfigKeyMigrator {
             return String.join(".", parts);
         }
 
-        private String newPathOf(String path) {
+        private @Nullable String newPathOf(String path) {
             String[] parts = path.split("\\.");
             StringBuilder oldPrefix = new StringBuilder();
             for (int i = 0; i < parts.length; i++) {
@@ -465,7 +477,7 @@ public final class ConfigKeyMigrator {
         private final Map<String, String> applied = new LinkedHashMap<>();
         private final Map<String, String> holders = new HashMap<>();
 
-        PathRename(Source source, InputStream legacyDefaults, Map<String, String> renames) {
+        PathRename(Source source, @Nullable InputStream legacyDefaults, Map<String, String> renames) {
             super(source, legacyDefaults);
             this.renames = renames;
         }
@@ -488,15 +500,15 @@ public final class ConfigKeyMigrator {
         }
 
         // The text with one rename applied, or null if it stays as it is.
-        private String renameOne(String text, String oldPath, String newPath) {
+        private @Nullable String renameOne(String text, String oldPath, String newPath) {
             Parsed parsed = source.parse(text);
             List<Line> lines = parsed.lines();
             int index = YamlLines.indexOfPath(lines, oldPath);
             Line line = lines.get(index);
-            Key key = line.key();
             String newParent = YamlLines.parentOf(newPath);
             String newName = newPath.substring(newPath.lastIndexOf('.') + 1);
 
+            @Nullable
             String holder = holders.get(newPath);
             if (holder == null && (YamlLines.indexOfPath(lines, newPath) >= 0 || source.yaml().contains(newPath))) {
                 holder = newPath;
@@ -513,6 +525,7 @@ public final class ConfigKeyMigrator {
                         + " other (reported once)");
                 return null;
             }
+            Key key = line.requireKey();
             String token = source.token(newName, text.substring(key.start(), key.end()));
             if (newParent.equals(key.parent())) {
                 done(oldPath, newPath);
@@ -554,7 +567,7 @@ public final class ConfigKeyMigrator {
                 offset = lines.get(end).end();
             } else {
                 int top = index;
-                while (!lines.get(top).key().parent().isEmpty()) {
+                while (!lines.get(top).requireKey().requireParent().isEmpty()) {
                     top--;
                     while (lines.get(top).kind() != Kind.KEY || lines.get(top).path() == null) {
                         top--;
@@ -616,7 +629,7 @@ public final class ConfigKeyMigrator {
             renamed.add(oldPath + " -> " + newPath);
         }
 
-        private String newPathOf(String path) {
+        private @Nullable String newPathOf(String path) {
             for (String gone : removedPaths) {
                 if (overlap(path, gone) && !inside(gone, path)) {
                     return null;
@@ -634,10 +647,11 @@ public final class ConfigKeyMigrator {
     // Every leaf value of the file is read back at its expected path (null: its
     // block was removed), and no other value appears.
     static boolean keepsValues(ConfigurationSection before, ConfigurationSection after,
-            Function<String, String> newPathOf, Map<String, String> listKeyRenames) {
+            Function<String, @Nullable String> newPathOf, Map<String, String> listKeyRenames) {
         int expected = 0;
         for (String path : before.getKeys(true)) {
             Object value = before.get(path);
+            @Nullable
             String newPath = value instanceof ConfigurationSection ? null : newPathOf.apply(path);
             if (newPath == null) {
                 continue;
@@ -657,7 +671,7 @@ public final class ConfigKeyMigrator {
     }
 
     // Maps inside lists may have renamed keys; everything else must be equal.
-    private static boolean sameData(Object a, Object b, Map<String, String> keyRenames) {
+    private static boolean sameData(@Nullable Object a, @Nullable Object b, Map<String, String> keyRenames) {
         if (a instanceof List<?> x && b instanceof List<?> y) {
             if (x.size() != y.size()) {
                 return false;
@@ -675,7 +689,7 @@ public final class ConfigKeyMigrator {
             }
             Iterator<? extends Map.Entry<?, ?>> other = y.entrySet().iterator();
             for (Map.Entry<?, ?> entry : x.entrySet()) {
-                Map.Entry<?, ?> next = other.next();
+                Map.Entry<?, ?> next = Objects.requireNonNull(other.next(), "map entry");
                 String oldKey = String.valueOf(entry.getKey());
                 String newKey = String.valueOf(next.getKey());
                 if (!newKey.equals(oldKey) && !newKey.equals(keyRenames.get(oldKey))) {
@@ -690,7 +704,7 @@ public final class ConfigKeyMigrator {
         return Objects.equals(a, b);
     }
 
-    private static void warn(Logger logger, String message) {
+    private static void warn(@Nullable Logger logger, String message) {
         if (logger != null) {
             logger.warning(message);
         }

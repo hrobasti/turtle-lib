@@ -2,6 +2,7 @@ package net.kroet.turtlelib.helper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -18,7 +19,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,6 +46,7 @@ class UpdateCheckerFixtureTest {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3");
         var selected = checker.selectModrinthVersion(loadFixture("modrinth_match.json"));
 
+        assertNotNull(selected);
         assertEquals("1.8.0", selected.json().get("version_number").getAsString());
         assertFalse(selected.compatibilityUnknown());
     }
@@ -54,6 +58,7 @@ class UpdateCheckerFixtureTest {
 
         // No game_versions field at all is treated as "unknown", not an automatic
         // match - it's only picked when no better candidate exists.
+        assertNotNull(selected);
         assertEquals("1.9.0", selected.json().get("version_number").getAsString());
         assertTrue(selected.compatibilityUnknown());
     }
@@ -86,6 +91,7 @@ class UpdateCheckerFixtureTest {
         var selected = checker.selectHangarVersion(loadFixture("hangar_array.json"));
 
         // 1.4.0 targets 26.4 only; 1.3.2 matches but is on the Snapshot channel.
+        assertNotNull(selected);
         assertEquals("1.3.1", selected.json().get("name").getAsString());
         assertFalse(selected.compatibilityUnknown());
     }
@@ -95,6 +101,7 @@ class UpdateCheckerFixtureTest {
         UpdateChecker checker = new UpdateChecker(false, true, "26.3.2");
         var selected = checker.selectHangarVersion(loadFixture("hangar_array.json"));
 
+        assertNotNull(selected);
         assertEquals("1.3.1", selected.json().get("name").getAsString());
     }
 
@@ -109,6 +116,7 @@ class UpdateCheckerFixtureTest {
                 [{"name": "1.3.0", "channel": {"name": "Release"}, "platformDependencies": {"PAPER": ["26.4"]}},
                  {"name": "1.2.0", "channel": {"name": "Release"}}]
                 """));
+        assertNotNull(selected);
         assertEquals("1.2.0", selected.json().get("name").getAsString());
         assertTrue(selected.compatibilityUnknown());
     }
@@ -127,8 +135,10 @@ class UpdateCheckerFixtureTest {
         var on262 = new UpdateChecker(false, true, "26.2").selectHangarVersion(fixture);
         var on2612 = new UpdateChecker(false, true, "26.1.2").selectHangarVersion(fixture);
 
+        assertNotNull(on262);
         assertEquals("1.2.2", on262.json().get("name").getAsString());
         assertFalse(on262.compatibilityUnknown());
+        assertNotNull(on2612);
         assertEquals("1.2.1", on2612.json().get("name").getAsString());
     }
 
@@ -139,6 +149,7 @@ class UpdateCheckerFixtureTest {
 
         // With filterByServerVersion=false, the first eligible (non-prerelease) entry
         // wins regardless of game_versions.
+        assertNotNull(selected);
         assertEquals("2.0.0", selected.json().get("version_number").getAsString());
     }
 
@@ -161,8 +172,11 @@ class UpdateCheckerFixtureTest {
                 [{"version_number": "1.9.1"}, {"version_number": "2.0.0"}]
                 """));
 
+        assertNotNull(modrinth);
         assertEquals("2.0.0", modrinth.json().get("version_number").getAsString());
+        assertNotNull(hangar);
         assertEquals("2.0.0", hangar.json().get("name").getAsString());
+        assertNotNull(unknown);
         assertEquals("2.0.0", unknown.json().get("version_number").getAsString());
         assertTrue(unknown.compatibilityUnknown());
     }
@@ -185,7 +199,9 @@ class UpdateCheckerFixtureTest {
                  {"name": "v2.1.0+build.7", "channel": {"name": "Release"}}]
                 """));
 
+        assertNotNull(modrinth);
         assertEquals("2.0.0", modrinth.json().get("version_number").getAsString());
+        assertNotNull(hangar);
         assertEquals("v2.1.0+build.7", hangar.json().get("name").getAsString());
     }
 
@@ -211,6 +227,7 @@ class UpdateCheckerFixtureTest {
 
         var selected = assertTimeoutPreemptively(Duration.ofSeconds(5), () -> checker.selectModrinthVersion(versions));
 
+        assertNotNull(selected);
         assertEquals("1.0.39999", selected.json().get("version_number").getAsString());
     }
 
@@ -230,12 +247,12 @@ class UpdateCheckerFixtureTest {
                  {"version_number": "1.9.0"}]
                 """;
 
-        assertEquals("2.0.0", checker.selectModrinthVersion(JsonParser.parseString(versions)).json()
+        assertEquals("2.0.0", Objects.requireNonNull(checker.selectModrinthVersion(JsonParser.parseString(versions))).json()
                 .get("version_number").getAsString());
-        assertEquals("1.9.0", checker.selectModrinthVersion(JsonParser.parseString(
-                versions.replace("\"fabric\", \"paper\"", "\"quilt\""))).json().get("version_number").getAsString());
-        assertEquals("2.0.0", checker.selectModrinthVersion(JsonParser.parseString(
-                versions.replace("\"fabric\", \"paper\"", "\"purpur\""))).json().get("version_number").getAsString());
+        assertEquals("1.9.0", Objects.requireNonNull(checker.selectModrinthVersion(JsonParser.parseString(
+                versions.replace("\"fabric\", \"paper\"", "\"quilt\"")))).json().get("version_number").getAsString());
+        assertEquals("2.0.0", Objects.requireNonNull(checker.selectModrinthVersion(JsonParser.parseString(
+                versions.replace("\"fabric\", \"paper\"", "\"purpur\"")))).json().get("version_number").getAsString());
     }
 
     // Hangar's Unstable flag marks prereleases whatever the channel is called;
@@ -265,7 +282,7 @@ class UpdateCheckerFixtureTest {
         }
     }
 
-    private static String nameOf(UpdateChecker checker, String channel, String flags, String version) {
+    private static @Nullable String nameOf(UpdateChecker checker, String channel, @Nullable String flags, String version) {
         String flagsJson = flags == null ? "" : ", \"flags\": " + flags;
         var selected = checker.selectHangarVersion(JsonParser.parseString("[{\"name\": \"" + version
                 + "\", \"channel\": {\"name\": \"" + channel + "\"" + flagsJson + "}}]"));

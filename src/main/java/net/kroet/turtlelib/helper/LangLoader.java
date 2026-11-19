@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.jar.JarEntry;
@@ -24,6 +25,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared utility for copying and synchronizing bundled locale files across
@@ -50,6 +52,7 @@ public final class LangLoader {
     interface Source {
         File dataFolder();
 
+        @Nullable
         InputStream resource(String path);
 
         /** Copies a bundled resource; IllegalArgumentException if it isn't bundled. */
@@ -68,7 +71,7 @@ public final class LangLoader {
                 }
 
                 @Override
-                public InputStream resource(String path) {
+                public @Nullable InputStream resource(String path) {
                     return plugin.getResource(path);
                 }
 
@@ -113,7 +116,7 @@ public final class LangLoader {
 
     // en_US if the plugin ships it, else its alphabetically first bundled locale;
     // null if it ships none.
-    static String baseLocale(Source source) {
+    static @Nullable String baseLocale(Source source) {
         if (hasResource(source, "lang/" + DEFAULT_LOCALE + ".yml")) {
             return DEFAULT_LOCALE;
         }
@@ -133,7 +136,7 @@ public final class LangLoader {
         }
     }
 
-    public static List<String> syncLocale(JavaPlugin plugin, String locale) {
+    public static List<String> syncLocale(JavaPlugin plugin, @Nullable String locale) {
         return syncLocale(plugin, locale, Collections.emptyMap());
     }
 
@@ -142,12 +145,13 @@ public final class LangLoader {
      * name like {@link ConfigKeyMigrator#rewriteLegacyKeysInFile}; a rejected
      * rename list throws {@link IllegalArgumentException} before any file access.
      */
-    public static List<String> syncLocale(JavaPlugin plugin, String locale, Map<String, String> legacyKeyMigrations) {
+    public static List<String> syncLocale(JavaPlugin plugin, @Nullable String locale,
+            @Nullable Map<String, String> legacyKeyMigrations) {
         return syncLocale(plugin, locale, legacyKeyMigrations, null);
     }
 
-    static List<String> syncLocale(JavaPlugin plugin, String locale, Map<String, String> legacyKeyMigrations,
-            String legacyDefaultsRoot) {
+    static List<String> syncLocale(JavaPlugin plugin, @Nullable String locale,
+            @Nullable Map<String, String> legacyKeyMigrations, @Nullable String legacyDefaultsRoot) {
         checkRenames(legacyKeyMigrations);
         Source source = Source.of(plugin);
         String base = baseLocale(source);
@@ -157,7 +161,7 @@ public final class LangLoader {
 
     // Rejects a rename list with conflicting, chained or depth-changing entries,
     // whether or not the lang file can be read.
-    static void checkRenames(Map<String, String> legacyKeyMigrations) {
+    static void checkRenames(@Nullable Map<String, String> legacyKeyMigrations) {
         if (legacyKeyMigrations != null && !legacyKeyMigrations.isEmpty()) {
             ConfigKeyMigrator.deriveLeafRenames(legacyKeyMigrations);
         }
@@ -165,11 +169,12 @@ public final class LangLoader {
 
     // target and defaults are null when neither the locale nor the base is bundled;
     // target is also null when the file is unreadable and was left untouched.
-    record SyncResult(List<String> added, YamlConfiguration target, YamlConfiguration defaults, boolean unreadable) {
+    record SyncResult(List<String> added, @Nullable YamlConfiguration target, @Nullable YamlConfiguration defaults,
+            boolean unreadable) {
     }
 
-    private static SyncResult sync(Source source, String normalized, String base,
-            Map<String, String> legacyKeyMigrations, String legacyDefaultsRoot) {
+    private static SyncResult sync(Source source, String normalized, @Nullable String base,
+            @Nullable Map<String, String> legacyKeyMigrations, @Nullable String legacyDefaultsRoot) {
         File langFile = ensureLocaleFile(source, normalized);
         String defaultsText = bundledText(source, normalized);
         if (defaultsText == null && base != null && !base.equals(normalized)) {
@@ -190,7 +195,7 @@ public final class LangLoader {
      * {@code langFile}; a file that isn't valid YAML stays byte-identical.
      */
     static SyncResult syncFile(File langFile, String fileLabel, String defaultsText,
-            Map<String, String> legacyKeyMigrations, String legacyDefaultsText, Logger logger) {
+            @Nullable Map<String, String> legacyKeyMigrations, @Nullable String legacyDefaultsText, Logger logger) {
         checkRenames(legacyKeyMigrations);
         YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new StringReader(defaultsText));
         LangFile target = readLangFile(langFile, fileLabel, logger);
@@ -260,7 +265,7 @@ public final class LangLoader {
     // Reads UTF-8, or Windows-1252 if the bytes aren't valid UTF-8, and warns once
     // instead of logging a SEVERE stack trace. Returns null for a broken file and
     // an empty config for a missing one.
-    private static LangFile readLangFile(File file, String fileLabel, Logger logger) {
+    private static @Nullable LangFile readLangFile(File file, String fileLabel, Logger logger) {
         YamlConfiguration yaml = new YamlConfiguration();
         if (!file.exists()) {
             return new LangFile(yaml, true);
@@ -283,7 +288,7 @@ public final class LangLoader {
     // <light_red> is no MiniMessage color and renders as literal text, so it
     // becomes <red> (#FF5555, §c). Works on the raw bytes, as the tags are ASCII
     // and the file may be UTF-8 or Windows-1252.
-    static boolean repairInvalidColorTags(File file, Logger logger, String fileLabel) {
+    static boolean repairInvalidColorTags(@Nullable File file, @Nullable Logger logger, String fileLabel) {
         if (file == null || !file.isFile()) {
             return false;
         }
@@ -309,7 +314,7 @@ public final class LangLoader {
         }
     }
 
-    public static YamlConfiguration loadLocale(JavaPlugin plugin, String locale) {
+    public static YamlConfiguration loadLocale(JavaPlugin plugin, @Nullable String locale) {
         return loadLocale(plugin, locale, Collections.emptyMap());
     }
 
@@ -317,7 +322,8 @@ public final class LangLoader {
      * Same as {@link #loadLocale(JavaPlugin, String)}, but also migrates renamed
      * message keys - see {@link #syncLocale(JavaPlugin, String, Map)}.
      */
-    public static YamlConfiguration loadLocale(JavaPlugin plugin, String locale, Map<String, String> legacyKeyMigrations) {
+    public static YamlConfiguration loadLocale(JavaPlugin plugin, @Nullable String locale,
+            @Nullable Map<String, String> legacyKeyMigrations) {
         checkRenames(legacyKeyMigrations);
         ensureBundledLocales(plugin);
         return loadActiveLocale(plugin, locale, legacyKeyMigrations, null, null);
@@ -327,13 +333,15 @@ public final class LangLoader {
      * Syncs and loads only {@code locale}, parsing its file once; keys merged into
      * it are added to {@code addedKeys} if that isn't {@code null}.
      */
-    static YamlConfiguration loadActiveLocale(JavaPlugin plugin, String locale,
-            Map<String, String> legacyKeyMigrations, String legacyDefaultsRoot, List<String> addedKeys) {
+    static YamlConfiguration loadActiveLocale(JavaPlugin plugin, @Nullable String locale,
+            @Nullable Map<String, String> legacyKeyMigrations, @Nullable String legacyDefaultsRoot,
+            @Nullable List<String> addedKeys) {
         return loadActiveLocale(Source.of(plugin), locale, legacyKeyMigrations, legacyDefaultsRoot, addedKeys);
     }
 
-    static YamlConfiguration loadActiveLocale(Source source, String locale,
-            Map<String, String> legacyKeyMigrations, String legacyDefaultsRoot, List<String> addedKeys) {
+    static YamlConfiguration loadActiveLocale(Source source, @Nullable String locale,
+            @Nullable Map<String, String> legacyKeyMigrations, @Nullable String legacyDefaultsRoot,
+            @Nullable List<String> addedKeys) {
         checkRenames(legacyKeyMigrations);
         String base = baseLocale(source);
         String normalized = resolveLocale(source.logger(), locale, base);
@@ -342,18 +350,21 @@ public final class LangLoader {
             addedKeys.addAll(sync.added());
         }
         YamlConfiguration configuration;
+        @Nullable
         YamlConfiguration defaults;
+        YamlConfiguration syncTarget = sync.target();
+        YamlConfiguration syncDefaults = sync.defaults();
         if (sync.unreadable()) {
             // The bundled texts stand in for the broken file; the base locale gets no
             // defaults, as its bundled copy would be its own defaults.
-            configuration = sync.defaults();
+            configuration = Objects.requireNonNull(syncDefaults, "defaults of an unreadable lang file");
             defaults = normalized.equals(base) ? null : loadDefaults(source, base);
         } else {
-            configuration = sync.target() != null
-                    ? sync.target()
+            configuration = syncTarget != null
+                    ? syncTarget
                     : YamlConfiguration.loadConfiguration(ensureLocaleFile(source, normalized));
-            defaults = normalized.equals(base) && sync.defaults() != null
-                    ? sync.defaults()
+            defaults = normalized.equals(base) && syncDefaults != null
+                    ? syncDefaults
                     : loadDefaults(source, base);
         }
         if (defaults != null) {
@@ -363,17 +374,17 @@ public final class LangLoader {
         return configuration;
     }
 
-    public static YamlConfiguration loadLocaleResource(JavaPlugin plugin, String locale) {
+    public static @Nullable YamlConfiguration loadLocaleResource(JavaPlugin plugin, String locale) {
         return loadLocaleResource(Source.of(plugin), locale);
     }
 
-    private static YamlConfiguration loadLocaleResource(Source source, String locale) {
+    private static @Nullable YamlConfiguration loadLocaleResource(Source source, String locale) {
         String text = bundledText(source, locale);
         return text == null ? null : YamlConfiguration.loadConfiguration(new StringReader(text));
     }
 
     // The bundled lang/<locale>.yml as UTF-8 text, or null if it isn't bundled.
-    private static String bundledText(Source source, String locale) {
+    private static @Nullable String bundledText(Source source, String locale) {
         String normalized = normalize(locale);
         if (normalized == null) {
             normalized = DEFAULT_LOCALE;
@@ -381,7 +392,7 @@ public final class LangLoader {
         return resourceText(source, "lang/" + normalized + ".yml");
     }
 
-    private static String resourceText(Source source, String path) {
+    private static @Nullable String resourceText(Source source, String path) {
         try (InputStream in = source.resource(path)) {
             return in == null ? null : new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -420,7 +431,7 @@ public final class LangLoader {
         return out;
     }
 
-    private static String missingTranslationWarning(String locale, String base, Set<String> bundled) {
+    private static String missingTranslationWarning(String locale, @Nullable String base, Set<String> bundled) {
         if (base == null) {
             return "No bundled translation for " + locale + " and no bundled lang files; lang/" + locale
                     + ".yml starts empty, and texts it lacks show as their keys";
@@ -429,7 +440,7 @@ public final class LangLoader {
                 + ".yml. Available: " + String.join(", ", new TreeSet<>(bundled));
     }
 
-    private static YamlConfiguration loadDefaults(Source source, String base) {
+    private static @Nullable YamlConfiguration loadDefaults(Source source, @Nullable String base) {
         return base == null ? null : loadLocaleResource(source, base);
     }
 
@@ -481,11 +492,11 @@ public final class LangLoader {
         return locales;
     }
 
-    private static boolean isLocaleIdentifier(String candidate) {
+    private static boolean isLocaleIdentifier(@Nullable String candidate) {
         return candidate != null && LOCALE_PATTERN.matcher(candidate).matches();
     }
 
-    private static File resolvePluginJar(JavaPlugin plugin) {
+    private static @Nullable File resolvePluginJar(JavaPlugin plugin) {
         try {
             URL location = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
             if (location == null) {
@@ -505,9 +516,9 @@ public final class LangLoader {
      * {@link JavaPlugin} instance.
      */
     static boolean mergeSections(ConfigurationSection target,
-            ConfigurationSection defaults,
-            String pathPrefix,
-            List<String> addedKeys) {
+            @Nullable ConfigurationSection defaults,
+            @Nullable String pathPrefix,
+            @Nullable List<String> addedKeys) {
         boolean changed = false;
         if (defaults == null) {
             return false;
@@ -542,7 +553,7 @@ public final class LangLoader {
 
     // Paths where the admin's file has a plain value and the defaults a section;
     // the merge keeps those values.
-    static List<String> valuesInPlaceOfSections(ConfigurationSection target, ConfigurationSection defaults,
+    static List<String> valuesInPlaceOfSections(ConfigurationSection target, @Nullable ConfigurationSection defaults,
             String pathPrefix) {
         List<String> paths = new ArrayList<>();
         if (defaults == null) {
@@ -568,12 +579,12 @@ public final class LangLoader {
      * base locale (see {@link #DEFAULT_LOCALE}) if it isn't one. Warns about
      * invalid values so the admin can find the typo.
      */
-    public static String resolveLocale(JavaPlugin plugin, String locale) {
+    public static String resolveLocale(JavaPlugin plugin, @Nullable String locale) {
         Source source = Source.of(plugin);
         return resolveLocale(source.logger(), locale, baseLocale(source));
     }
 
-    private static String resolveLocale(Logger logger, String locale, String base) {
+    private static String resolveLocale(Logger logger, @Nullable String locale, @Nullable String base) {
         String normalized = normalize(locale);
         if (normalized != null) {
             return normalized;
@@ -588,7 +599,7 @@ public final class LangLoader {
 
     // Accepts "de_DE", "de-de" or "de_DE.yml". Anything else is null, so a
     // config value can never point outside the lang folder.
-    static String normalize(String locale) {
+    static @Nullable String normalize(@Nullable String locale) {
         if (locale == null) {
             return null;
         }

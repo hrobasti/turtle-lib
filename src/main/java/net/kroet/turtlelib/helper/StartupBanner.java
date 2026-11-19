@@ -16,6 +16,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Prints a MiniMessage-colored startup banner to the console. Plugin authors
@@ -27,11 +28,11 @@ public final class StartupBanner {
     private static final String DEFAULT_COLOR = "<light_purple>";
     private static final Pattern OPENING_TAG = Pattern.compile("<(!?)([A-Za-z0-9_#-]+)(?::[^>]*)?>");
     private static final Pattern HEX_COLOR = Pattern.compile("#[0-9A-Fa-f]{6}");
-    private final JavaPlugin plugin;
+    private final @Nullable JavaPlugin plugin; // null only for linesBuilder()
     private final List<String> lines;
     private final String colorTag;
 
-    private StartupBanner(JavaPlugin plugin, List<String> lines, String colorTag) {
+    private StartupBanner(@Nullable JavaPlugin plugin, List<String> lines, String colorTag) {
         this.plugin = plugin;
         this.lines = lines == null ? List.of() : List.copyOf(lines);
         this.colorTag = (colorTag == null || colorTag.isBlank()) ? "<white>" : colorTag.trim();
@@ -59,6 +60,7 @@ public final class StartupBanner {
         if (lines.isEmpty()) {
             return;
         }
+        JavaPlugin plugin = Objects.requireNonNull(this.plugin, "plugin");
         var console = plugin.getServer().getConsoleSender();
         if (console == null) {
             return;
@@ -99,19 +101,19 @@ public final class StartupBanner {
     }
 
     public static final class Builder {
-        private final JavaPlugin plugin;
+        private final @Nullable JavaPlugin plugin;
         private final List<String> manualLines = new ArrayList<>();
-        private String resourcePath;
+        private @Nullable String resourcePath;
         private String colorTag = DEFAULT_COLOR;
 
-        private Builder(JavaPlugin plugin) {
+        private Builder(@Nullable JavaPlugin plugin) {
             this.plugin = plugin;
         }
 
         /**
          * Adds a single banner line defined in code.
          */
-        public Builder addLine(String line) {
+        public Builder addLine(@Nullable String line) {
             if (line != null) {
                 manualLines.add(line);
             }
@@ -121,7 +123,7 @@ public final class StartupBanner {
         /**
          * Replaces existing manual lines with the provided list.
          */
-        public Builder lines(List<String> lines) {
+        public Builder lines(@Nullable List<String> lines) {
             manualLines.clear();
             if (lines != null) {
                 lines.stream().filter(Objects::nonNull).forEach(manualLines::add);
@@ -133,7 +135,7 @@ public final class StartupBanner {
          * Optional resource path (relative to the plugin JAR) that contains the banner
          * text.
          */
-        public Builder resource(String relativePath) {
+        public Builder resource(@Nullable String relativePath) {
             this.resourcePath = relativePath;
             return this;
         }
@@ -143,7 +145,7 @@ public final class StartupBanner {
          * {@code <gradient:#ff7e5f:#feb47b>}. Anything else logs a warning and switches
          * to the default {@code <light_purple>}, also after an earlier valid color.
          */
-        public Builder color(String miniMessageColorTag) {
+        public Builder color(@Nullable String miniMessageColorTag) {
             if (miniMessageColorTag == null || miniMessageColorTag.isBlank()) {
                 return this;
             }
@@ -151,7 +153,7 @@ public final class StartupBanner {
             if (isColorTag(tag)) {
                 this.colorTag = tag;
             } else {
-                plugin.getLogger().warning("StartupBanner: " + tag + " isn't a MiniMessage color tag; using "
+                Objects.requireNonNull(plugin, "plugin").getLogger().warning("StartupBanner: " + tag + " isn't a MiniMessage color tag; using "
                         + DEFAULT_COLOR);
                 this.colorTag = DEFAULT_COLOR;
             }
@@ -166,9 +168,11 @@ public final class StartupBanner {
         }
 
         private List<String> loadResourceLines() {
+            String resourcePath = this.resourcePath;
             if (resourcePath == null || resourcePath.isBlank()) {
                 return Collections.emptyList();
             }
+            JavaPlugin plugin = Objects.requireNonNull(this.plugin, "plugin");
             try (InputStream in = plugin.getResource(resourcePath)) {
                 if (in == null) {
                     plugin.getLogger().warning("StartupBanner resource not found: " + resourcePath);
